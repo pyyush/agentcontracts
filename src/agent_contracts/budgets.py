@@ -61,6 +61,15 @@ class BudgetTracker:
         self._tool_calls: int = 0
         self._start_time: float = time.monotonic()
 
+    def _safe_cost_callback(self) -> float:
+        """Call cost callback safely, falling back to internal counter on error."""
+        if self._cost_callback:
+            try:
+                return self._cost_callback()
+            except Exception:
+                return self._cost_usd
+        return self._cost_usd
+
     @property
     def is_configured(self) -> bool:
         """Whether any budget limits are configured."""
@@ -69,7 +78,7 @@ class BudgetTracker:
     def snapshot(self) -> BudgetSnapshot:
         """Get a thread-safe snapshot of current consumption."""
         with self._lock:
-            cost = self._cost_callback() if self._cost_callback else self._cost_usd
+            cost = self._safe_cost_callback()
             return BudgetSnapshot(
                 cost_usd=cost,
                 tokens=self._tokens,
@@ -114,7 +123,7 @@ class BudgetTracker:
 
     def _check_cost(self) -> None:
         if self._budgets and self._budgets.max_cost_usd is not None:
-            cost = self._cost_callback() if self._cost_callback else self._cost_usd
+            cost = self._safe_cost_callback()
             if cost > self._budgets.max_cost_usd:
                 raise BudgetExceededError("cost_usd", cost, self._budgets.max_cost_usd)
 

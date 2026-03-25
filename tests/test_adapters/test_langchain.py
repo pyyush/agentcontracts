@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict
 
 import pytest
 import yaml
-from pathlib import Path
 
 from agent_contracts.adapters.langchain import ContractCallbackHandler
 from agent_contracts.enforcer import ContractViolation
-from agent_contracts.loader import load_contract
 
 
 @pytest.fixture

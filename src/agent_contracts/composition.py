@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from agent_contracts.effects import validate_declared_subset
+from agent_contracts.effects import matches_any, validate_declared_subset
 from agent_contracts.types import Contract
 
 
@@ -135,10 +135,8 @@ def _check_capability_compatibility(
     # If producer has authorized effects and attenuates during delegation,
     # check that consumer's needed tools are within producer's scope
     if producer.effects_authorized and consumer.effects_authorized:
-        from agent_contracts.effects import _matches_any
-
         for tool in consumer.effects_authorized.tools:
-            if not _matches_any(tool, producer.effects_authorized.tools):
+            if not matches_any(tool, producer.effects_authorized.tools):
                 gaps.append(CapabilityGap(
                     tool=tool,
                     reason=f"Consumer needs tool '{tool}' but producer doesn't authorize it.",

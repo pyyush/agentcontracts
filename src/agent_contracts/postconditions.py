@@ -42,7 +42,11 @@ class PostconditionError(Exception):
 
 
 def _resolve_path(obj: Any, path: str) -> Any:
-    """Resolve a dotted path like 'output.status' against an object or dict."""
+    """Resolve a dotted path like 'output.status' against an object or dict.
+
+    Only traverses dicts by key lookup. Does not use getattr to avoid
+    triggering properties or descriptors on untrusted objects.
+    """
     parts = path.split(".")
     current = obj
     for part in parts:
@@ -50,8 +54,6 @@ def _resolve_path(obj: Any, path: str) -> Any:
             if part not in current:
                 return None
             current = current[part]
-        elif hasattr(current, part):
-            current = getattr(current, part)
         else:
             return None
     return current

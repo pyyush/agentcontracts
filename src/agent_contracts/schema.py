@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 import jsonschema
 
-_SCHEMA_DIR = Path(__file__).resolve().parent.parent.parent / "schemas"
+_SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
 _SCHEMA_FILE = _SCHEMA_DIR / "agent-contract.schema.json"
 
 

@@ -63,7 +63,7 @@ def _extract_budgets(traces: List[Dict[str, Any]]) -> Dict[str, Any]:
         cost = usage.get("cost_usd", 0) or trace.get("cost_usd", 0)
         tokens = usage.get("total_tokens", 0) or trace.get("total_tokens", 0)
         tool_calls = len(trace.get("tool_calls", []))
-        duration = trace.get("duration_seconds", 0) or trace.get("latency_ms", 0) / 1000
+        duration = trace.get("duration_seconds", 0) or (trace.get("latency_ms") or 0) / 1000
 
         max_cost = max(max_cost, cost)
         max_tokens = max(max_tokens, tokens)

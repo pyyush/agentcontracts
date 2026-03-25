@@ -11,6 +11,7 @@ single enforcement flow. Supports three usage patterns:
 from __future__ import annotations
 
 import functools
+import inspect
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
@@ -252,7 +253,12 @@ def enforce_contract(
             enforcer = ContractEnforcer(
                 contract, violation_destination=violation_destination
             )
-            kwargs["_enforcer"] = enforcer
+            # Only inject _enforcer if the function accepts it
+            sig = inspect.signature(fn)
+            if "_enforcer" in sig.parameters or any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            ):
+                kwargs["_enforcer"] = enforcer
 
             # Pre: validate input if first positional arg is present
             if args and contract.input_schema is not None:

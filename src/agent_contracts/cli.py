@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Optional
 
 import click
 import yaml
@@ -154,8 +155,8 @@ def check_compat(producer_path: str, consumer_path: str, json_output: bool) -> N
 @click.option("--name", "-n", "agent_name", help="Agent name override.")
 @click.option("--version", "-v", "agent_version", help="Agent version override.")
 @click.option("--output", "-o", "output_path", type=click.Path(), help="Output file path.")
-def init(trace_path: str | None, agent_name: str | None, agent_version: str | None,
-         output_path: str | None) -> None:
+def init(trace_path: Optional[str], agent_name: Optional[str], agent_version: Optional[str],
+         output_path: Optional[str]) -> None:
     """Generate a contract skeleton (optionally from execution traces)."""
     from agent_contracts.init_from_trace import generate_contract_yaml
 
@@ -196,7 +197,7 @@ def init(trace_path: str | None, agent_name: str | None, agent_version: str | No
 @click.argument("contract_path", type=click.Path(exists=True))
 @click.option("--eval-suite", "-e", "eval_dir", type=click.Path(exists=True),
               help="Directory containing eval test cases (JSONL).")
-def test(contract_path: str, eval_dir: str | None) -> None:
+def test(contract_path: str, eval_dir: Optional[str]) -> None:
     """Run eval suite against contract postconditions."""
     from agent_contracts.loader import ContractLoadError, load_contract
     from agent_contracts.postconditions import PostconditionError, evaluate_postconditions

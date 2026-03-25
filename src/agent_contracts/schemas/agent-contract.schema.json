@@ -1,0 +1,450 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pyyush/agent-contracts/schemas/agent-contract.schema.json",
+  "title": "Agent Contract",
+  "description": "YAML specification for enforceable agent behavioral contracts. Supports three graduated tiers: Standalone (Tier 0), Enforceable (Tier 1), and Composable (Tier 2).",
+  "type": "object",
+  "required": ["agent_contract", "identity", "contract"],
+  "additionalProperties": true,
+  "patternProperties": {
+    "^x-": {
+      "description": "Extension fields for forward compatibility."
+    }
+  },
+  "properties": {
+    "agent_contract": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+",
+      "description": "Spec version (semver). Enables forward compatibility via must-ignore semantics for unknown fields."
+    },
+    "identity": {
+      "$ref": "#/$defs/Identity"
+    },
+    "contract": {
+      "$ref": "#/$defs/Contract"
+    },
+    "inputs": {
+      "$ref": "#/$defs/Inputs"
+    },
+    "outputs": {
+      "$ref": "#/$defs/Outputs"
+    },
+    "effects": {
+      "$ref": "#/$defs/Effects"
+    },
+    "resources": {
+      "$ref": "#/$defs/Resources"
+    },
+    "failure_model": {
+      "$ref": "#/$defs/FailureModel"
+    },
+    "delegation": {
+      "$ref": "#/$defs/Delegation"
+    },
+    "observability": {
+      "$ref": "#/$defs/Observability"
+    },
+    "versioning": {
+      "$ref": "#/$defs/Versioning"
+    },
+    "slo": {
+      "$ref": "#/$defs/SLO"
+    }
+  },
+  "$defs": {
+    "Identity": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique agent identifier. Used for logging, composition, and registry lookup."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+",
+          "description": "Agent implementation version (semver). Required for regression tracking."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this agent does."
+        },
+        "authors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of agent authors or maintainers."
+        }
+      }
+    },
+    "Contract": {
+      "type": "object",
+      "required": ["postconditions"],
+      "additionalProperties": true,
+      "properties": {
+        "postconditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/Postcondition" },
+          "description": "At least one machine-checkable output guarantee. This is what makes it a contract, not a README."
+        }
+      }
+    },
+    "Postcondition": {
+      "type": "object",
+      "required": ["name", "check"],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable postcondition name."
+        },
+        "check": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expression to evaluate. Supports CEL-like syntax (e.g., 'output.status in [\"resolved\", \"escalated\"]') or 'eval:judge' for LLM-as-judge."
+        },
+        "enforcement": {
+          "type": "string",
+          "enum": ["sync_block", "sync_warn", "async_monitor"],
+          "default": "sync_warn",
+          "description": "When and how this check runs. sync_block: fails the invocation. sync_warn: logs warning. async_monitor: evaluates asynchronously."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "major", "minor"],
+          "default": "major",
+          "description": "Impact level when this postcondition fails."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable explanation of what this postcondition guarantees."
+        },
+        "slo": {
+          "$ref": "#/$defs/PostconditionSLO"
+        }
+      }
+    },
+    "PostconditionSLO": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "target_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target satisfaction rate (e.g., 0.995 = 99.5%)."
+        },
+        "window": {
+          "type": "string",
+          "description": "Rolling window for SLO measurement (e.g., '1h', '24h', '7d')."
+        }
+      }
+    },
+    "Inputs": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "JSON Schema for validating agent inputs. Rejects malformed inputs before the agent runs."
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "check"],
+            "properties": {
+              "name": { "type": "string" },
+              "check": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          },
+          "description": "Preconditions that must hold before the agent runs."
+        }
+      }
+    },
+    "Outputs": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "JSON Schema for validating agent outputs. Catches schema drift and downstream parser errors."
+        }
+      }
+    },
+    "Effects": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "authorized": {
+          "$ref": "#/$defs/EffectsAuthorized"
+        },
+        "declared": {
+          "$ref": "#/$defs/EffectsDeclared"
+        }
+      }
+    },
+    "EffectsAuthorized": {
+      "type": "object",
+      "description": "Capability scope — what the agent MAY do. Default: deny all. Composes via intersection during delegation.",
+      "additionalProperties": true,
+      "properties": {
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allowlist of tool names or glob patterns (e.g., 'database.*'). Tools not listed are BLOCKED."
+        },
+        "network": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allowed network egress URL patterns (e.g., 'https://api.example.com/*')."
+        },
+        "state_writes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allowed state write scope patterns (e.g., 'tickets.*', 'user.preferences')."
+        }
+      }
+    },
+    "EffectsDeclared": {
+      "type": "object",
+      "description": "Effect footprint — what side effects actually occur. Composes via union for auditing. Runtime enforces declared ⊆ authorized.",
+      "additionalProperties": true,
+      "properties": {
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tools that this agent actually invokes."
+        },
+        "network": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Network endpoints this agent actually contacts."
+        },
+        "state_writes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "State scopes this agent actually modifies."
+        }
+      }
+    },
+    "Resources": {
+      "type": "object",
+      "description": "Per-invocation resource budgets. Circuit breaker trips when thresholds are hit.",
+      "additionalProperties": true,
+      "properties": {
+        "budgets": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "max_cost_usd": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Maximum cost in USD per invocation."
+            },
+            "max_tokens": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Maximum total tokens (input + output) per invocation."
+            },
+            "max_tool_calls": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Maximum number of tool calls per invocation."
+            },
+            "max_duration_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Maximum wall-clock time in seconds per invocation."
+            }
+          }
+        }
+      }
+    },
+    "FailureModel": {
+      "type": "object",
+      "description": "Typed errors with retry and fallback semantics. Prevents retry storms and cascading failures.",
+      "additionalProperties": true,
+      "properties": {
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": true,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Error type identifier."
+              },
+              "retryable": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether this error type can be retried."
+              },
+              "max_retries": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Maximum retry attempts for this error type."
+              },
+              "fallback": {
+                "type": "string",
+                "description": "Agent or action to invoke as fallback."
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "default_timeout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Default timeout for the agent invocation."
+        },
+        "circuit_breaker": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "failure_threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of consecutive failures before opening circuit."
+            },
+            "reset_timeout_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Time before attempting to half-open the circuit."
+            }
+          }
+        }
+      }
+    },
+    "Delegation": {
+      "type": "object",
+      "description": "Rules for delegating work to sub-agents. Prevents confused deputy vulnerabilities.",
+      "additionalProperties": true,
+      "properties": {
+        "max_depth": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum delegation chain depth."
+        },
+        "attenuate_effects": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether authorized effects attenuate (intersect) during delegation."
+        },
+        "require_contract": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether sub-agents must have their own contract."
+        },
+        "allowed_agents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allowlist of agent names that can be delegated to."
+        }
+      }
+    },
+    "Observability": {
+      "type": "object",
+      "description": "Required telemetry configuration. Powers dashboards, alerts, and canary analysis.",
+      "additionalProperties": true,
+      "properties": {
+        "traces": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "sample_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": { "type": "string" },
+              "type": { "type": "string", "enum": ["counter", "histogram", "gauge"] },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "violation_events": {
+          "type": "object",
+          "properties": {
+            "emit": { "type": "boolean", "default": true },
+            "destination": {
+              "type": "string",
+              "enum": ["stdout", "otel", "callback"],
+              "default": "stdout"
+            }
+          }
+        }
+      }
+    },
+    "Versioning": {
+      "type": "object",
+      "description": "Content-addressed build identification and breaking change rules.",
+      "additionalProperties": true,
+      "properties": {
+        "build_id": {
+          "type": "string",
+          "description": "Content-addressed build identifier (e.g., SHA-256 of model + prompt + config)."
+        },
+        "breaking_changes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of breaking changes from the previous version."
+        },
+        "substitution": {
+          "type": "object",
+          "properties": {
+            "compatible_with": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Versions this agent can substitute for (Liskov-style)."
+            }
+          }
+        }
+      }
+    },
+    "SLO": {
+      "type": "object",
+      "description": "Service Level Objectives for aggregate contract satisfaction.",
+      "additionalProperties": true,
+      "properties": {
+        "contract_satisfaction_rate": {
+          "type": "object",
+          "properties": {
+            "target": { "type": "number", "minimum": 0, "maximum": 1 },
+            "window": { "type": "string" }
+          }
+        },
+        "latency": {
+          "type": "object",
+          "properties": {
+            "p50_ms": { "type": "number" },
+            "p99_ms": { "type": "number" }
+          }
+        },
+        "cost": {
+          "type": "object",
+          "properties": {
+            "avg_usd": { "type": "number" },
+            "p99_usd": { "type": "number" }
+          }
+        },
+        "error_budget_policy": {
+          "type": "string",
+          "description": "Action when error budget is exhausted (e.g., 'freeze_deployments', 'alert_only')."
+        }
+      }
+    }
+  }
+}

@@ -26,7 +26,7 @@ class EffectDeniedError(Exception):
         )
 
 
-def _matches_any(name: str, patterns: List[str]) -> bool:
+def matches_any(name: str, patterns: List[str]) -> bool:
     """Check if a name matches any of the given glob patterns."""
     return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
 
@@ -50,19 +50,19 @@ class EffectGuard:
         """Check if a tool call is authorized. Returns True if allowed."""
         if self._authorized is None:
             return True  # No authorization configured = allow all
-        return _matches_any(tool_name, self._authorized.tools)
+        return matches_any(tool_name, self._authorized.tools)
 
     def check_network(self, url: str) -> bool:
         """Check if a network request is authorized."""
         if self._authorized is None:
             return True
-        return _matches_any(url, self._authorized.network)
+        return matches_any(url, self._authorized.network)
 
     def check_state_write(self, scope: str) -> bool:
         """Check if a state write is authorized."""
         if self._authorized is None:
             return True
-        return _matches_any(scope, self._authorized.state_writes)
+        return matches_any(scope, self._authorized.state_writes)
 
     def require_tool(self, tool_name: str) -> None:
         """Assert a tool call is authorized; raise EffectDeniedError if not."""
@@ -105,7 +105,7 @@ def intersect_authorized(
     def _intersect_lists(parent_list: List[str], child_list: List[str]) -> List[str]:
         result: List[str] = []
         for c in child_list:
-            if _matches_any(c, parent_list) or any(
+            if matches_any(c, parent_list) or any(
                 fnmatch.fnmatch(p, c) for p in parent_list
             ):
                 result.append(c)
@@ -146,13 +146,13 @@ def validate_declared_subset(
     """
     violations: List[str] = []
     for tool in declared.tools:
-        if not _matches_any(tool, authorized.tools):
+        if not matches_any(tool, authorized.tools):
             violations.append(f"Declared tool '{tool}' not in authorized tools.")
     for url in declared.network:
-        if not _matches_any(url, authorized.network):
+        if not matches_any(url, authorized.network):
             violations.append(f"Declared network '{url}' not in authorized network.")
     for scope in declared.state_writes:
-        if not _matches_any(scope, authorized.state_writes):
+        if not matches_any(scope, authorized.state_writes):
             violations.append(
                 f"Declared state_write '{scope}' not in authorized state_writes."
             )

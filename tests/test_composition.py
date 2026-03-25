@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-import pytest
-
 from agent_contracts.composition import check_compatibility
 from agent_contracts.loader import load_contract
 

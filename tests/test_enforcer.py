@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any, Dict
 
 import pytest
-import yaml
 
 from agent_contracts.enforcer import ContractEnforcer, ContractViolation, enforce_contract
 from agent_contracts.loader import load_contract

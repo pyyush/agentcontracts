@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -68,15 +69,18 @@ class ViolationEmitter:
         self._destination = destination
         self._callback = callback
         self._events: List[ViolationEvent] = []
+        self._lock = threading.Lock()
 
     @property
     def events(self) -> List[ViolationEvent]:
-        """All events emitted during this emitter's lifetime."""
-        return list(self._events)
+        """All events emitted during this emitter's lifetime (thread-safe copy)."""
+        with self._lock:
+            return list(self._events)
 
     def emit(self, event: ViolationEvent) -> None:
-        """Emit a violation event."""
-        self._events.append(event)
+        """Emit a violation event (thread-safe)."""
+        with self._lock:
+            self._events.append(event)
 
         if self._destination == "stdout":
             print(
@@ -140,5 +144,6 @@ class ViolationEmitter:
         return event
 
     def clear(self) -> None:
-        """Clear the event history."""
-        self._events.clear()
+        """Clear the event history (thread-safe)."""
+        with self._lock:
+            self._events.clear()
