@@ -1,0 +1,219 @@
+# Tier 2 — Composable Contract (Full Reference Example)
+# Supports multi-agent DAG composition, canary analysis, rollback,
+# and regulatory audit trails.
+
+agent_contract: "0.1.0"
+
+identity:
+  name: support-triage-agent
+  version: "2.1.0"
+  description: >
+    Triages incoming support tickets by analyzing content, classifying
+    priority, and routing to the appropriate team. Handles 500+ tickets/day
+    with 99.5% contract satisfaction.
+  authors:
+    - Piyush Vyas
+
+contract:
+  postconditions:
+    - name: produces_classification
+      check: "output is not None"
+      enforcement: sync_block
+      severity: critical
+      description: Must always produce a triage result.
+
+    - name: valid_priority
+      check: 'output.priority in ["critical", "high", "medium", "low"]'
+      enforcement: sync_block
+      severity: critical
+      description: Priority must be one of the defined levels.
+
+    - name: has_routing
+      check: 'output.routed_to is not None'
+      enforcement: sync_warn
+      severity: major
+      description: Should route to a team (warn if not).
+      slo:
+        target_rate: 0.99
+        window: "24h"
+
+    - name: response_quality
+      check: "eval:quality_judge"
+      enforcement: async_monitor
+      severity: minor
+      description: LLM-as-judge quality assessment (async, not blocking).
+      slo:
+        target_rate: 0.95
+        window: "7d"
+
+inputs:
+  schema:
+    type: object
+    required:
+      - ticket_id
+      - subject
+      - body
+    properties:
+      ticket_id:
+        type: string
+      subject:
+        type: string
+      body:
+        type: string
+      customer_tier:
+        type: string
+        enum: ["enterprise", "business", "starter", "free"]
+      attachments:
+        type: array
+        items:
+          type: object
+          properties:
+            filename:
+              type: string
+            url:
+              type: string
+
+  preconditions:
+    - name: ticket_not_empty
+      check: "len(input.body) > 0"
+      description: Ticket body must not be empty.
+
+outputs:
+  schema:
+    type: object
+    required:
+      - priority
+      - category
+    properties:
+      priority:
+        type: string
+        enum: ["critical", "high", "medium", "low"]
+      category:
+        type: string
+      routed_to:
+        type: string
+      summary:
+        type: string
+      suggested_response:
+        type: string
+      confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+
+effects:
+  authorized:
+    tools:
+      - ticket_database.read
+      - ticket_database.update_priority
+      - ticket_database.assign
+      - customer_lookup
+      - knowledge_base.search
+      - notification.send_team
+    network:
+      - "https://api.ticketing.internal/*"
+      - "https://api.customers.internal/*"
+      - "https://kb.internal/*"
+    state_writes:
+      - "tickets.*"
+
+  declared:
+    tools:
+      - ticket_database.read
+      - ticket_database.update_priority
+      - ticket_database.assign
+      - customer_lookup
+      - knowledge_base.search
+    network:
+      - "https://api.ticketing.internal/v2/tickets"
+      - "https://api.customers.internal/v1/lookup"
+      - "https://kb.internal/search"
+    state_writes:
+      - "tickets.priority"
+      - "tickets.assignment"
+
+resources:
+  budgets:
+    max_cost_usd: 0.10
+    max_tokens: 8000
+    max_tool_calls: 15
+    max_duration_seconds: 20.0
+
+failure_model:
+  errors:
+    - name: ticket_not_found
+      retryable: false
+      description: The referenced ticket does not exist.
+
+    - name: database_timeout
+      retryable: true
+      max_retries: 3
+      description: Ticket database took too long to respond.
+
+    - name: rate_limit
+      retryable: true
+      max_retries: 2
+      fallback: queue-agent
+      description: API rate limit exceeded, queue for later processing.
+
+    - name: classification_uncertain
+      retryable: false
+      fallback: human-review-queue
+      description: Agent confidence too low for automated triage.
+
+  default_timeout_seconds: 20.0
+
+  circuit_breaker:
+    failure_threshold: 10
+    reset_timeout_seconds: 120.0
+
+delegation:
+  max_depth: 2
+  attenuate_effects: true
+  require_contract: true
+  allowed_agents:
+    - queue-agent
+    - human-review-queue
+    - notification-agent
+
+observability:
+  traces:
+    enabled: true
+    sample_rate: 1.0
+
+  metrics:
+    - name: triage_latency_ms
+      type: histogram
+      description: End-to-end triage latency.
+    - name: triage_total
+      type: counter
+      description: Total tickets triaged.
+    - name: priority_distribution
+      type: gauge
+      description: Current distribution of ticket priorities.
+
+  violation_events:
+    emit: true
+    destination: otel
+
+versioning:
+  build_id: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  breaking_changes: []
+  substitution:
+    compatible_with:
+      - "2.0.0"
+
+slo:
+  contract_satisfaction_rate:
+    target: 0.995
+    window: "24h"
+
+  latency:
+    p50_ms: 800
+    p99_ms: 5000
+
+  cost:
+    avg_usd: 0.04
+    p99_usd: 0.10
+
+  error_budget_policy: freeze_deployments

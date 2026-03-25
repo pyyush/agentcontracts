@@ -1,0 +1,70 @@
+# Tier 1 — Enforceable Contract
+# Adds cost control, tool-use security, and input/output validation.
+# The SDK can enforce these at the boundary.
+
+agent_contract: "0.1.0"
+
+identity:
+  name: cost-controlled-researcher
+  version: "1.2.0"
+  description: A research agent with strict cost and tool-use controls.
+
+contract:
+  postconditions:
+    - name: produces_output
+      check: "output is not None"
+      enforcement: sync_block
+      severity: critical
+
+    - name: output_has_sources
+      check: "len(output.sources) > 0"
+      enforcement: sync_warn
+      severity: major
+      description: Research output should include at least one source.
+
+inputs:
+  schema:
+    type: object
+    required:
+      - query
+    properties:
+      query:
+        type: string
+        minLength: 1
+      max_results:
+        type: integer
+        minimum: 1
+        maximum: 50
+
+outputs:
+  schema:
+    type: object
+    properties:
+      summary:
+        type: string
+      sources:
+        type: array
+        items:
+          type: string
+      confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+
+effects:
+  authorized:
+    tools:
+      - web_search
+      - document_reader
+      - summarizer
+    network:
+      - "https://api.search-provider.com/*"
+      - "https://docs.example.com/*"
+    state_writes: []
+
+resources:
+  budgets:
+    max_cost_usd: 0.50
+    max_tokens: 15000
+    max_tool_calls: 10
+    max_duration_seconds: 60.0
