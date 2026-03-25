@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 import jsonschema
 
 from agent_contracts.budgets import BudgetExceededError, BudgetTracker
-from agent_contracts.effects import EffectDeniedError, EffectGuard
+from agent_contracts.effects import EffectGuard
 from agent_contracts.loader import load_contract
 from agent_contracts.postconditions import (
     PostconditionResult,

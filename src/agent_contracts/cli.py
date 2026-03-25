@@ -24,7 +24,11 @@ def main() -> None:
 @click.option("--json-output", "-j", is_flag=True, help="Output as JSON.")
 def validate(contract_path: str, json_output: bool) -> None:
     """Validate a contract YAML file against the spec."""
-    from agent_contracts.loader import ContractLoadError, load_contract, validate_contract, load_contract_yaml
+    from agent_contracts.loader import (
+        ContractLoadError,
+        load_contract_yaml,
+        validate_contract,
+    )
     from agent_contracts.tier import assess_tier, recommend_upgrades
 
     try:
@@ -65,7 +69,7 @@ def validate(contract_path: str, json_output: bool) -> None:
                 click.echo(f"  - {e}")
             sys.exit(1)
         else:
-            click.echo(f"\nValidation: PASSED")
+            click.echo("\nValidation: PASSED")
 
         click.echo(f"Tier: {tier} ({tier_names.get(tier, 'Unknown')})")
 
@@ -195,7 +199,7 @@ def init(trace_path: str | None, agent_name: str | None, agent_version: str | No
 def test(contract_path: str, eval_dir: str | None) -> None:
     """Run eval suite against contract postconditions."""
     from agent_contracts.loader import ContractLoadError, load_contract
-    from agent_contracts.postconditions import evaluate_postconditions, PostconditionError
+    from agent_contracts.postconditions import PostconditionError, evaluate_postconditions
 
     try:
         contract = load_contract(contract_path)
