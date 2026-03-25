@@ -9,7 +9,7 @@ Usage (3 lines):
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 from agent_contracts.enforcer import ContractEnforcer, ContractViolation
 from agent_contracts.loader import load_contract

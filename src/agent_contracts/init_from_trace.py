@@ -10,7 +10,6 @@ Reads JSONL trace files and infers:
 from __future__ import annotations
 
 import json
-from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
@@ -22,7 +21,7 @@ def _read_traces(source: Union[str, Path]) -> List[Dict[str, Any]]:
     path = Path(source)
     traces: List[Dict[str, Any]] = []
     with open(path, encoding="utf-8") as f:
-        for line_num, line in enumerate(f, 1):
+        for _line_num, line in enumerate(f, 1):
             line = line.strip()
             if not line:
                 continue

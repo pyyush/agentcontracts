@@ -95,7 +95,6 @@ class ViolationEmitter:
         try:
             from opentelemetry import trace
 
-            tracer = trace.get_tracer("agent-contracts")
             span = trace.get_current_span()
             if span and span.is_recording():
                 span.add_event(
