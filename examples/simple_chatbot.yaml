@@ -1,0 +1,18 @@
+# Tier 0 — Minimal Valid Contract
+# A developer gets value from writing this even if nothing else reads it.
+# 4 fields. Adopt in 5 minutes. No runtime required.
+
+agent_contract: "0.1.0"
+
+identity:
+  name: simple-chatbot
+  version: "1.0.0"
+  description: A basic conversational chatbot with a single quality guarantee.
+
+contract:
+  postconditions:
+    - name: produces_response
+      check: "output is not None"
+      enforcement: sync_block
+      severity: critical
+      description: The chatbot must always produce a non-null response.
