@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentcontracts"
+name = "aicontracts"
 dynamic = ["version"]
 description = "YAML spec + validation SDK for production agent reliability — cost control, tool-use security, and audit trails."
 readme = "README.md"
@@ -41,10 +41,10 @@ langchain = ["langchain-core>=0.2"]
 crewai = ["crewai>=0.50"]
 pydantic-ai = ["pydantic-ai>=0.1"]
 all = [
-    "agentcontracts[otel]",
-    "agentcontracts[langchain]",
-    "agentcontracts[crewai]",
-    "agentcontracts[pydantic-ai]",
+    "aicontracts[otel]",
+    "aicontracts[langchain]",
+    "aicontracts[crewai]",
+    "aicontracts[pydantic-ai]",
 ]
 dev = [
     "pytest>=8.0",
@@ -54,7 +54,7 @@ dev = [
 ]
 
 [project.scripts]
-agentcontracts = "agent_contracts.cli:main"
+aicontracts = "agent_contracts.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/pyyush/agentcontracts"

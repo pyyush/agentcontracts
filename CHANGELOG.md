@@ -23,10 +23,10 @@ First release. YAML spec + Python SDK for production agent reliability.
 - **Runtime Enforcer** — Unified middleware wiring effects, budgets, postconditions, and violations. Works as decorator (`@enforce_contract`), context manager, or explicit API
 - **Composition Checker** — Contract Differential analysis: schema gaps, capability gaps, budget gaps, effect violations between producer/consumer contracts
 - **CLI** — Four commands:
-  - `agentcontracts validate` — schema validation + tier + recommendations
-  - `agentcontracts check-compat` — composition compatibility check
-  - `agentcontracts init --from-trace` — generate contract skeleton from JSONL traces
-  - `agentcontracts test --eval-suite` — run eval suite against postconditions
+  - `aicontracts validate` — schema validation + tier + recommendations
+  - `aicontracts check-compat` — composition compatibility check
+  - `aicontracts init --from-trace` — generate contract skeleton from JSONL traces
+  - `aicontracts test --eval-suite` — run eval suite against postconditions
 - **Framework Adapters** — LangChain (`ContractCallbackHandler`), CrewAI (`ContractGuard`), Pydantic AI (`ContractMiddleware`). Each under 200 lines, 3-line integration
 - **MCP Extension Proposal** — `x-agent-contract` for tool-level preconditions, effect declarations, and trust metadata
 - **Specification** — Human-readable spec narrative (`SPECIFICATION.md`)

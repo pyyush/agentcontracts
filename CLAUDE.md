@@ -54,10 +54,10 @@ pytest --cov             # With coverage
 ## Key Commands
 
 ```bash
-agentcontracts validate contract.yaml
-agentcontracts check-compat a.yaml b.yaml
-agentcontracts init --from-trace traces.jsonl
-agentcontracts test contract.yaml --eval-suite evals/
+aicontracts validate contract.yaml
+aicontracts check-compat a.yaml b.yaml
+aicontracts init --from-trace traces.jsonl
+aicontracts test contract.yaml --eval-suite evals/
 ```
 
 ## Version

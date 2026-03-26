@@ -40,7 +40,7 @@ Contracts use graduated tiers. Start simple, add guarantees as production demand
 | `contract.postconditions[]` | array (min 1) | Yes | Machine-checkable output guarantees |
 
 A Tier 0 contract is useful on its own: it documents what the agent guarantees
-and can be validated locally with `agentcontracts validate`.
+and can be validated locally with `aicontracts validate`.
 
 ### Tier 1: Enforceable (adds runtime value)
 

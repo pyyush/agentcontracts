@@ -5,7 +5,7 @@
 Cost control, tool-use security, and audit trails in under 30 minutes of integration. Works with any framework. Enforces at the runtime layer, not via prompts.
 
 ```
-pip install agentcontracts
+pip install aicontracts
 ```
 
 ## The Problem
@@ -53,7 +53,7 @@ resources:
 Or generate from observed behavior:
 
 ```bash
-agentcontracts init --from-trace traces.jsonl -o AGENT_CONTRACT.yaml
+aicontracts init --from-trace traces.jsonl -o AGENT_CONTRACT.yaml
 ```
 
 ### 2. Enforce at Runtime
@@ -112,16 +112,16 @@ Start simple, add guarantees as production demands.
 
 ```bash
 # Validate a contract
-agentcontracts validate AGENT_CONTRACT.yaml
+aicontracts validate AGENT_CONTRACT.yaml
 
 # Check composition compatibility
-agentcontracts check-compat producer.yaml consumer.yaml
+aicontracts check-compat producer.yaml consumer.yaml
 
 # Generate from execution traces
-agentcontracts init --from-trace traces.jsonl
+aicontracts init --from-trace traces.jsonl
 
 # Run eval suite against postconditions
-agentcontracts test AGENT_CONTRACT.yaml --eval-suite tests/
+aicontracts test AGENT_CONTRACT.yaml --eval-suite tests/
 ```
 
 ## Key Design Decisions
