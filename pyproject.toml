@@ -24,7 +24,11 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
     "Typing :: Typed",
 ]
-keywords = ["agent", "contracts", "llm", "safety", "validation", "mcp"]
+keywords = [
+    "agent", "contracts", "llm", "safety", "validation", "mcp",
+    "ai-agents", "guardrails", "governance", "compliance", "observability",
+    "opentelemetry", "budget", "cost-control", "tool-use", "audit",
+]
 dependencies = [
     "pyyaml>=6.0",
     "jsonschema>=4.20",

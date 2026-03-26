@@ -20,3 +20,4 @@ htmlcov/
 *.lcov
 .dev-session/
 .staff-engineer-state.json
+ROADMAP.md
