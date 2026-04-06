@@ -6,6 +6,10 @@
 
 `agent-contracts` lets a repository declare what an agent may read, write, run, call, and spend — and then emit one durable verdict artifact showing whether the run passed, warned, blocked, or failed.
 
+The contract, CLI, verdict artifact, and GitHub Action are **framework-agnostic and provider-agnostic by design** — they don't depend on any agent SDK or model provider. Optional adapters for Claude Agent SDK, OpenAI Agents SDK, and LangChain are thin ergonomic helpers that forward in-runtime hook calls into the same enforcer.
+
+> **The CI verdict gate is the source of truth.** The merge cannot go green if the verdict is `blocked` or `fail`. In-runtime adapters add convenience — the gate is what makes enforcement complete.
+
 ```bash
 pip install aicontracts
 ```
@@ -152,19 +156,23 @@ python -m agent_contracts.cli init --template coding
 python -m agent_contracts.cli check-verdict .agent-contracts/runs/<run-id>/verdict.json
 ```
 
-## Host integrations
+## Framework adapters (optional)
 
-### Claude Code / Claude SDK
+The core (contract, CLI, verdict artifact, GitHub Action) is framework-agnostic and provider-agnostic. Adapters are optional ergonomic helpers that wire in-runtime hook calls into the same enforcer. Each is pinned to a specific SDK version and tested against the real SDK in CI.
 
-Claude is the strongest local hard-stop path in this repo today because it can deny tool use before execution through hooks. Use the repo contract as the source of truth, and map the contract's allowlists into Claude's hook surface where possible.
+| Framework | Extra | Pinned SDK |
+|---|---|---|
+| Claude Agent SDK | `aicontracts[claude]` | `claude-agent-sdk==0.1.56` |
+| OpenAI Agents SDK | `aicontracts[openai]` | `openai-agents==0.13.5` |
+| LangChain | `aicontracts[langchain]` | `langchain-core==1.2.26` |
 
-### Codex
+All three SDK extras require Python 3.10+. The core package supports Python 3.9+.
 
-Codex can use the same repo-local contract for enforcement in wrappers and for final CI gating via verdict artifacts. The contract file stays in the repo; CI becomes the final source of truth for merge readiness.
+In-runtime adapters add hard-stop coverage where the host exposes a pre-execution hook, but enforcement completeness still depends on the host's hook surface. The CI verdict gate is what makes enforcement total: every merge runs the same evaluator against the same contract, regardless of which framework, model, or runtime produced the run.
 
-### OpenAI Agents SDK
+### v0.3.0 roadmap
 
-The OpenAI adapter can block tool execution at `on_tool_start`, but cannot recover reasoning tokens already spent deciding to call the tool. The docs and adapter are explicit about that limit.
+A companion `@aicontracts/*` TypeScript package with adapters for Vercel AI SDK, Claude TypeScript SDK, and OpenAI Agents JS is planned for v0.3.0.
 
 ## GitHub Action
 

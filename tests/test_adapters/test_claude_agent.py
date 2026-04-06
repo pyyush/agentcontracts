@@ -113,3 +113,26 @@ class TestContractHooks:
             "tool_input": {},
         }))
         assert len(hooks.violations) == 1
+
+
+class TestRealSDKIntegration:
+    """Verifies the hooks dict produced by the adapter is consumable by the
+    real claude-agent-sdk. Skipped if claude-agent-sdk is not installed
+    (it requires Python 3.10+)."""
+
+    def test_hooks_config_accepted_by_sdk(self, hooks) -> None:
+        sdk = pytest.importorskip("claude_agent_sdk")
+        config = hooks.get_hooks_config()
+        # Real SDK exposes ClaudeAgentOptions and accepts a hooks mapping.
+        options = sdk.ClaudeAgentOptions(hooks=config)
+        assert options.hooks is config
+
+    def test_pre_tool_use_signature_matches_hookcallback(self) -> None:
+        sdk = pytest.importorskip("claude_agent_sdk")
+        # Adapter callbacks must accept (input_data, tool_use_id, context).
+        assert hasattr(sdk, "HookCallback")
+        import inspect
+        sig = inspect.signature(ContractHooks.pre_tool_use)
+        params = list(sig.parameters)
+        # self + 3 hook params
+        assert params[1:] == ["input_data", "tool_use_id", "context"]

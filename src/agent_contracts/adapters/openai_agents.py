@@ -23,7 +23,7 @@ from agent_contracts.types import Contract
 from agent_contracts.violations import ViolationEvent
 
 try:
-    from openai_agents import RunHooks
+    from agents import RunHooks
 except ImportError:
     # Stub so the module can be imported without openai-agents
     class RunHooks:  # type: ignore[no-redef]
