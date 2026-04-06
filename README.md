@@ -214,6 +214,19 @@ action.yml                        GitHub composite action
 AGENT_CONTRACT.yaml               Canonical coding-agent contract
 ```
 
+## Why YAML, not Markdown?
+
+A contract is a machine-enforceable artifact, not documentation. Markdown is prose; YAML is structure. The difference matters when the same file has to be parsed by a CLI, an in-runtime enforcer, and a CI gate — and produce the same verdict every time.
+
+- **Deterministic parse.** YAML has a JSON Schema (`schemas/agent-contract.schema.json`). Every runtime, in any language, produces the same parse tree from the same file. Markdown would require an LLM or a brittle regex extractor, and the verdict would depend on which extractor you used.
+- **Fail-closed needs typed fields.** `effects.authorized.filesystem.write: ["src/**"]` is a list of glob patterns. There is no ambiguity about whether `tests/secret.env` is in scope. A Markdown bullet under "## Files the agent can write" is interpretation, and interpretation is exactly what coding-agent guardrails cannot afford.
+- **Diff-friendly review.** YAML diffs per field. A reviewer can see "this PR added `python -m mypy *` to authorized shell commands" as a one-line change. Markdown prose diffs are noisy and merge conflicts on policy text are hard to reason about.
+- **Versioned schema.** `agent_contract: "0.1.0"` declares the spec version. Older runtimes can refuse contracts they don't understand; newer runtimes can ignore unknown fields under the `x-` prefix. Markdown has no equivalent.
+- **Cloud-native muscle memory.** kubectl, GitHub Actions, OpenAPI, Helm, GitLab CI, ArgoCD — every fail-closed policy artifact in the ecosystem is YAML or JSON. Engineers already know how to author, lint, and review it.
+- **Still legible.** For the canonical coding-agent case (one identity block, one effects block, a few postconditions), the YAML is short enough to read without ceremony. The quick-start contract above fits on one screen.
+
+Markdown is the right format for the *human spec* (`spec/SPECIFICATION.md`) and for prose explanations of how the system works. It is not the right format for the file the enforcer reads on every run.
+
 ## Scope and non-goals
 
 This repo is intentionally narrow.
