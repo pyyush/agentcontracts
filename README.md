@@ -1,38 +1,42 @@
 # Agent Contracts
 
-[![PyPI](https://img.shields.io/pypi/v/aicontracts)](https://pypi.org/project/aicontracts/)
 [![CI](https://github.com/pyyush/agentcontracts/actions/workflows/ci.yml/badge.svg)](https://github.com/pyyush/agentcontracts/actions/workflows/ci.yml)
 
-**YAML spec + validation SDK for production agent reliability.**
+**Repo-local, fail-closed guardrails for autonomous coding/build agents.**
 
-Cost control, tool-use security, and audit trails in under 30 minutes of integration. Works with any framework. Enforces at the runtime layer, not via prompts.
+`agent-contracts` lets a repository declare what an agent may read, write, run, call, and spend — and then emit one durable verdict artifact showing whether the run passed, warned, blocked, or failed.
 
-```
+```bash
 pip install aicontracts
 ```
 
-## The Problem
+## What it solves
 
-Production agents fail at 41-87% rates. 97% of enterprises with agents in production haven't figured out how to scale them. The four pain points:
+Without a repo-local contract, coding agents usually run with ambient authority.
+That creates five common failure modes:
 
-| Problem | Without Contracts | With Contracts |
-|---------|------------------|----------------|
-| **Cost runaway** | No ceiling on token spend | Budget circuit breaker per invocation |
-| **Unauthorized tool use** | Ambient authority, prompt-bypassable | Default-deny allowlist at SDK layer |
-| **No audit trail** | No record of authorized vs. actual | OTel-compatible violation events |
-| **Silent regressions** | Prompt changes break things invisibly | Versioned contracts with SLO monitoring |
+- edits outside the intended file scope
+- forbidden shell commands
+- unauthorized tool or network calls
+- silent budget overruns
+- fake green runs when repo checks are red
 
-## 5-Minute Quick Start
+Agent Contracts keeps the scope narrow:
 
-### 1. Write a Contract (or generate one)
+> declare the repo-local contract, enforce it at runtime and in CI, and fail closed with a verdict artifact.
+
+## 5-minute quick start
+
+### 1. Write a coding-agent contract
 
 ```yaml
 # AGENT_CONTRACT.yaml
 agent_contract: "0.1.0"
 
 identity:
-  name: my-agent
-  version: "1.0.0"
+  name: repo-build-agent
+  version: "0.1.0"
+  description: Safe coding/build agent for this repository.
 
 contract:
   postconditions:
@@ -41,144 +45,185 @@ contract:
       enforcement: sync_block
       severity: critical
 
+    - name: repo_checks_green
+      check: "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0"
+      enforcement: sync_block
+      severity: critical
+
 effects:
   authorized:
-    tools: [search, database.read]
-    network: ["https://api.example.com/*"]
+    filesystem:
+      read: ["src/**", "tests/**", "README.md", "pyproject.toml"]
+      write: ["src/**", "tests/**", "README.md"]
+    shell:
+      commands:
+        - "python -m pytest *"
+        - "python -m ruff check *"
+    tools: []
+    network: []
+    state_writes: []
 
 resources:
   budgets:
-    max_cost_usd: 0.50
-    max_tokens: 10000
+    max_tokens: 50000
     max_tool_calls: 20
+    max_shell_commands: 10
+    max_duration_seconds: 1800
+
+observability:
+  run_artifact_path: ".agent-contracts/runs/{run_id}/verdict.json"
 ```
 
-Or generate from observed behavior:
-
-```bash
-aicontracts init --from-trace traces.jsonl -o AGENT_CONTRACT.yaml
-```
-
-### 2. Enforce at Runtime
+### 2. Enforce it in the agent runtime
 
 ```python
-from agent_contracts import load_contract, ContractEnforcer
+from agent_contracts import ContractEnforcer, load_contract
 
 contract = load_contract("AGENT_CONTRACT.yaml")
 
-with ContractEnforcer(contract) as enforcer:
-    # Each tool call is checked against the allowlist and budget
-    enforcer.check_tool_call("search")        # OK - in allowlist
-    enforcer.check_tool_call("delete_all")    # BLOCKED - not authorized
+with ContractEnforcer(contract, host_name="codex") as enforcer:
+    enforcer.check_file_read("src/app.py")
+    enforcer.check_file_write("src/app.py")
+    enforcer.check_shell_command("python -m pytest tests/test_app.py")
 
-    enforcer.add_cost(0.05)                   # Tracked against max_cost_usd
-    enforcer.add_tokens(500)                  # Tracked against max_tokens
+    result = {"status": "done"}
 
-    # Postconditions evaluated after execution
-    enforcer.evaluate_postconditions(result)
+    enforcer.record_check("pytest", "pass", exit_code=0)
+    enforcer.record_check("ruff", "pass", exit_code=0)
+    verdict = enforcer.finalize_run(output=result)
+
+print(verdict.outcome)      # pass | warn | blocked | fail
+print(verdict.artifacts)    # includes verdict artifact path
 ```
 
-### 3. Framework Integration (3 lines)
+### 3. Gate the verdict in CI
 
-**LangChain:**
-```python
-from agent_contracts.adapters.langchain import ContractCallbackHandler
-handler = ContractCallbackHandler.from_file("AGENT_CONTRACT.yaml")
-agent.invoke({"input": query}, config={"callbacks": [handler]})
+```bash
+python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
+python -m agent_contracts.cli check-verdict .agent-contracts/runs/<run-id>/verdict.json
 ```
 
-**CrewAI:**
-```python
-from agent_contracts.adapters.crewai import ContractGuard
-guard = ContractGuard.from_file("AGENT_CONTRACT.yaml")
-result = guard.execute(crew, inputs={"query": query})
+## Verdict artifacts
+
+Every meaningful run can emit one compact artifact, for example:
+
+```json
+{
+  "run_id": "...",
+  "outcome": "pass",
+  "final_gate": "allowed",
+  "checks": [
+    {"name": "pytest", "status": "pass", "exit_code": 0},
+    {"name": "ruff", "status": "pass", "exit_code": 0}
+  ],
+  "budgets": {
+    "tokens": 12345,
+    "tool_calls": 0,
+    "shell_commands": 2,
+    "duration_seconds": 18.2
+  },
+  "violations": []
+}
 ```
 
-**Pydantic AI:**
-```python
-from agent_contracts.adapters.pydantic_ai import ContractMiddleware
-middleware = ContractMiddleware.from_file("AGENT_CONTRACT.yaml")
-result = await middleware.run(agent, prompt)
-```
+Outcome semantics:
 
-**OpenAI Agents SDK:**
-```python
-from agent_contracts.adapters.openai_agents import ContractRunHooks
-hooks = ContractRunHooks.from_file("AGENT_CONTRACT.yaml")
-result = await Runner.run(agent, "prompt", run_hooks=[hooks])
-```
-
-**Claude Agent SDK:**
-```python
-from agent_contracts.adapters.claude_agent import ContractHooks
-hooks = ContractHooks.from_file("AGENT_CONTRACT.yaml")
-# Pass hooks.pre_tool_use to ClaudeAgentOptions
-```
-
-## Three Tiers
-
-Start simple, add guarantees as production demands.
-
-| Tier | Fields | Value |
-|------|--------|-------|
-| **0: Standalone** | identity + 1 postcondition (4 fields) | Self-documentation, local validation |
-| **1: Enforceable** | + schemas, effects, budgets | Cost control, tool gating, I/O validation |
-| **2: Composable** | + failure model, delegation, observability, SLOs | Multi-agent composition, audit trails, canary gates |
+- `pass` — required checks and blocking clauses passed
+- `warn` — allowed to proceed, but warnings were recorded
+- `blocked` — an operation was denied during the run
+- `fail` — the run completed, but required checks or critical postconditions failed
 
 ## CLI
 
 ```bash
-# Validate a contract
-aicontracts validate AGENT_CONTRACT.yaml
+# Validate a contract and show coding/build surfaces
+python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
 
 # Check composition compatibility
-aicontracts check-compat producer.yaml consumer.yaml
+python -m agent_contracts.cli check-compat producer.yaml consumer.yaml
 
-# Generate from execution traces
-aicontracts init --from-trace traces.jsonl
+# Bootstrap from traces
+python -m agent_contracts.cli init --from-trace traces.jsonl -o AGENT_CONTRACT.yaml
 
-# Run eval suite against postconditions
-aicontracts test AGENT_CONTRACT.yaml --eval-suite tests/
+# Generate a coding-agent starter template
+python -m agent_contracts.cli init --template coding
+
+# Gate a verdict artifact in CI
+python -m agent_contracts.cli check-verdict .agent-contracts/runs/<run-id>/verdict.json
 ```
 
-## Key Design Decisions
+## Host integrations
 
-1. **Spec + SDK, not protocol or platform** — the OpenAPI model
-2. **YAML primary** — JSON Schema validation, CEL-like inline expressions
-3. **Graduated tiers** — Tier 0 is 4 fields, not 40
-4. **Effects: authorized vs. declared** — intersection for delegation, union for audit
-5. **Enforcement at SDK layer** — never in prompts (prompt injection can't bypass)
-6. **MCP extension, not fork** — `x-agent-contract` on tool definitions
+### Claude Code / Claude SDK
 
-## Positioning
+Claude is the strongest local hard-stop path in this repo today because it can deny tool use before execution through hooks. Use the repo contract as the source of truth, and map the contract's allowlists into Claude's hook surface where possible.
 
-MCP governs how agents connect. Agent Skills govern what agents advertise.
-A2A governs how agents find each other. **Agent Contracts govern what agents
-must do, must not do, and what happens when they fail.**
+### Codex
 
-## Project Structure
+Codex can use the same repo-local contract for enforcement in wrappers and for final CI gating via verdict artifacts. The contract file stays in the repo; CI becomes the final source of truth for merge readiness.
 
+### OpenAI Agents SDK
+
+The OpenAI adapter can block tool execution at `on_tool_start`, but cannot recover reasoning tokens already spent deciding to call the tool. The docs and adapter are explicit about that limit.
+
+## GitHub Action
+
+```yaml
+- uses: pyyush/agentcontracts@v0.2.0
+  with:
+    contract: AGENT_CONTRACT.yaml
+    verdict: .agent-contracts/runs/${{ github.run_id }}/verdict.json
 ```
-schemas/                    JSON Schema for AGENT_CONTRACT.yaml
-spec/SPECIFICATION.md       Human-readable spec narrative
-mcp/x-agent-contract.md    MCP extension proposal
-src/agent_contracts/        Python SDK
-  loader.py                 Contract loading + validation
-  enforcer.py               Runtime enforcement middleware
-  effects.py                Default-deny effect gating
-  budgets.py                Budget tracking + circuit breaker
-  postconditions.py         Postcondition evaluation
-  violations.py             OTel-compatible violation events
-  composition.py            Contract Differential checker
-  cli.py                    CLI tool
-  adapters/                 Framework adapters
-examples/                   Reference contracts (Tier 0, 1, 2)
+
+The action validates contracts and, when a verdict path is provided, fails the workflow for `blocked` or `fail` outcomes.
+
+## Canonical examples
+
+- `AGENT_CONTRACT.yaml` — canonical repo-build agent contract
+- `examples/repo_build_agent.yaml` — reference coding/build repo contract
+- `examples/demo_blocked_file_write.yaml` — protected-file demo
+- `examples/demo_blocked_command.yaml` — forbidden-command demo
+- `examples/demo_failed_checks.yaml` — red-checks demo
+- `examples/support_triage.yaml` — broader tier-2 example retained for composition docs
+
+## Project structure
+
+```text
+schemas/                          JSON Schema for AGENT_CONTRACT.yaml
+spec/SPECIFICATION.md             Human-readable specification
+src/agent_contracts/              Python SDK
+  cli.py                          CLI entry point
+  loader.py                       YAML loading + validation
+  types.py                        Dataclasses / type model
+  effects.py                      Tool, filesystem, network, and shell authorization
+  budgets.py                      Budget tracking
+  postconditions.py               Postcondition evaluation
+  enforcer.py                     Runtime enforcement + verdict artifacts
+  init_from_trace.py              Bootstrap from traces
+  adapters/                       Host/framework integrations
+examples/                         Reference contracts and demos
+action.yml                        GitHub composite action
+AGENT_CONTRACT.yaml               Canonical coding-agent contract
 ```
+
+## Scope and non-goals
+
+This repo is intentionally narrow.
+
+In scope:
+
+- repo-local contracts for coding/build agents
+- file, shell, tool, network, and budget boundaries
+- runtime + CI gating
+- durable verdict artifacts
+
+Out of scope for the current release:
+
+- hosted control planes
+- compliance dashboards
+- generic agent governance positioning
+- speculative multi-agent infrastructure
 
 ## License
 
 Apache-2.0
-
-## Author
-
-Piyush Vyas

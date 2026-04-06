@@ -1,4 +1,4 @@
-"""Claude Agent SDK adapter — contract enforcement via hooks.
+"""Claude Agent SDK adapter — repo-local contract enforcement via hooks.
 
 Usage (3 lines):
     from agent_contracts.adapters.claude_agent import ContractHooks

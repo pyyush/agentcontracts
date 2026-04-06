@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "aicontracts"
 dynamic = ["version"]
-description = "YAML spec + validation SDK for production agent reliability — cost control, tool-use security, and audit trails."
+description = "Repo-local, fail-closed guardrails for autonomous coding/build agents."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.9"
@@ -25,9 +25,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 keywords = [
-    "agent", "contracts", "llm", "safety", "validation", "mcp",
-    "ai-agents", "guardrails", "governance", "compliance", "observability",
-    "opentelemetry", "budget", "cost-control", "tool-use", "audit",
+    "agent", "contracts", "coding-agent", "build-agent", "guardrails", "repo-local",
+    "fail-closed", "budgets", "tool-use", "filesystem", "shell", "ci",
 ]
 dependencies = [
     "pyyaml>=6.0",
@@ -96,3 +95,15 @@ python_version = "3.9"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "yaml",
+    "jsonschema",
+    "jsonschema.*",
+    "opentelemetry",
+    "opentelemetry.*",
+    "openai_agents",
+    "langchain_core.*",
+]
+ignore_missing_imports = true

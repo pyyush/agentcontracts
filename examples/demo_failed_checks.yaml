@@ -1,0 +1,15 @@
+agent_contract: "0.1.0"
+
+identity:
+  name: failed-checks-demo
+  version: "0.1.0"
+
+contract:
+  postconditions:
+    - name: repo_checks_green
+      check: "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0"
+      enforcement: sync_block
+      severity: critical
+
+observability:
+  run_artifact_path: ".agent-contracts/runs/{run_id}/verdict.json"

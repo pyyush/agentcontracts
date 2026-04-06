@@ -1,5 +1,5 @@
-name: 'AI Contracts Validate'
-description: 'Validate agent contracts against the AI Contracts spec'
+name: 'Agent Contracts Gate'
+description: 'Validate repo-local agent contracts and optionally gate a run verdict artifact'
 branding:
   icon: 'shield'
   color: 'blue'
@@ -8,8 +8,16 @@ inputs:
   contract:
     description: 'Path to contract YAML file(s), space-separated'
     required: true
+  verdict:
+    description: 'Optional verdict artifact path to gate'
+    required: false
+    default: ''
   fail-on-warning:
-    description: 'Fail if contract has upgrade recommendations'
+    description: 'Fail if contract validation returns upgrade recommendations'
+    required: false
+    default: 'false'
+  fail-on-warn-outcome:
+    description: 'Fail if the verdict outcome is warn'
     required: false
     default: 'false'
   python-version:
@@ -20,10 +28,13 @@ inputs:
 outputs:
   outcome:
     description: 'pass or fail'
-    value: ${{ steps.validate.outputs.outcome }}
+    value: ${{ steps.gate.outputs.outcome }}
   tier:
     description: 'Contract tier (0, 1, or 2)'
-    value: ${{ steps.validate.outputs.tier }}
+    value: ${{ steps.gate.outputs.tier }}
+  verdict-outcome:
+    description: 'Verdict outcome when a verdict artifact is provided'
+    value: ${{ steps.gate.outputs.verdict_outcome }}
 
 runs:
   using: 'composite'
@@ -34,25 +45,46 @@ runs:
 
     - name: Install aicontracts
       shell: bash
-      run: pip install aicontracts
+      run: python -m pip install aicontracts==0.2.0
 
-    - name: Validate contracts
-      id: validate
+    - name: Validate contract and verdict
+      id: gate
       shell: bash
       run: |
+        set -euo pipefail
         outcome="pass"
+        tier=""
+        verdict_outcome=""
+
         for contract in ${{ inputs.contract }}; do
           echo "::group::Validating $contract"
-          result=$(aicontracts validate "$contract" -j)
-          if [ $? -eq 0 ]; then
-            tier=$(echo "$result" | python3 -c "import sys,json; print(json.load(sys.stdin)['tier'])")
-            echo "tier=$tier" >> "$GITHUB_OUTPUT"
-          else
+          result=$(python -m agent_contracts.cli validate "$contract" --json-output)
+          tier=$(echo "$result" | python -c 'import json,sys; data=json.load(sys.stdin); print(data["tier"])')
+          recommendations=$(echo "$result" | python -c 'import json,sys; data=json.load(sys.stdin); print(len(data["recommendations"]))')
+          echo "$result"
+          echo "::endgroup::"
+          if [ "${{ inputs.fail-on-warning }}" = "true" ] && [ "$recommendations" -gt 0 ]; then
             outcome="fail"
           fi
-          echo "::endgroup::"
         done
+
+        if [ -n "${{ inputs.verdict }}" ]; then
+          echo "::group::Checking verdict ${{ inputs.verdict }}"
+          extra_flag=""
+          if [ "${{ inputs.fail-on-warn-outcome }}" = "true" ]; then
+            extra_flag="--fail-on-warn"
+          fi
+          if ! python -m agent_contracts.cli check-verdict "${{ inputs.verdict }}" $extra_flag; then
+            outcome="fail"
+          fi
+          verdict_outcome=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["outcome"])' "${{ inputs.verdict }}")
+          echo "::endgroup::"
+        fi
+
+        echo "tier=$tier" >> "$GITHUB_OUTPUT"
         echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
+        echo "verdict_outcome=$verdict_outcome" >> "$GITHUB_OUTPUT"
+
         if [ "$outcome" = "fail" ]; then
           exit 1
         fi

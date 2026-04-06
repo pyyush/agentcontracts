@@ -1,4 +1,4 @@
-"""CLI for Agent Contracts — validate, check-compat, init, test."""
+"""CLI for Agent Contracts — repo-local guardrails for coding/build agents."""
 
 from __future__ import annotations
 
@@ -11,12 +11,13 @@ import click
 import yaml
 
 from agent_contracts._version import __version__
+from agent_contracts.enforcer import load_verdict_artifact
 
 
 @click.group()
 @click.version_option(version=__version__, prog_name="aicontracts")
 def main() -> None:
-    """Agent Contracts — YAML spec + SDK for production agent reliability."""
+    """Agent Contracts — repo-local fail-closed guardrails for coding/build agents."""
     pass
 
 
@@ -25,24 +26,24 @@ def main() -> None:
 @click.option("--json-output", "-j", is_flag=True, help="Output as JSON.")
 def validate(contract_path: str, json_output: bool) -> None:
     """Validate a contract YAML file against the spec."""
-    from agent_contracts.loader import (
-        ContractLoadError,
-        load_contract_yaml,
-        validate_contract,
-    )
+    from agent_contracts.loader import ContractLoadError, load_contract_yaml, validate_contract
     from agent_contracts.tier import assess_tier, recommend_upgrades
 
     try:
         data = load_contract_yaml(contract_path)
-    except ContractLoadError as e:
-        click.echo(f"Error: {e}", err=True)
+    except ContractLoadError as exc:
+        click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
 
     errors = validate_contract(data)
     tier = assess_tier(data)
     recommendations = recommend_upgrades(data, tier)
-
     tier_names = {0: "Standalone", 1: "Enforceable", 2: "Composable"}
+
+    authorized = data.get("effects", {}).get("authorized", {})
+    filesystem = authorized.get("filesystem", {}) if isinstance(authorized, dict) else {}
+    shell = authorized.get("shell", {}) if isinstance(authorized, dict) else {}
+    observability = data.get("observability", {})
 
     if json_output:
         result = {
@@ -51,33 +52,45 @@ def validate(contract_path: str, json_output: bool) -> None:
             "tier_name": tier_names.get(tier, "Unknown"),
             "errors": errors,
             "recommendations": [
-                {"field": r.field, "target_tier": r.target_tier, "reason": r.reason}
-                for r in recommendations
+                {
+                    "field": item.field,
+                    "target_tier": item.target_tier,
+                    "reason": item.reason,
+                }
+                for item in recommendations
             ],
+            "coding_surfaces": {
+                "filesystem_read": filesystem.get("read", []),
+                "filesystem_write": filesystem.get("write", []),
+                "shell_commands": shell.get("commands", []),
+                "run_artifact_path": observability.get("run_artifact_path"),
+            },
         }
         click.echo(json.dumps(result, indent=2))
     else:
         identity = data.get("identity", {})
-        name = identity.get("name", "unknown")
-        version = identity.get("version", "?")
-
-        click.echo(f"Contract: {name}@{version}")
+        click.echo(f"Contract: {identity.get('name', 'unknown')}@{identity.get('version', '?')}")
         click.echo(f"Spec version: {data.get('agent_contract', '?')}")
-
         if errors:
             click.echo(f"\nValidation: FAILED ({len(errors)} error(s))")
-            for e in errors:
-                click.echo(f"  - {e}")
+            for error in errors:
+                click.echo(f"  - {error}")
             sys.exit(1)
-        else:
-            click.echo("\nValidation: PASSED")
-
+        click.echo("\nValidation: PASSED")
         click.echo(f"Tier: {tier} ({tier_names.get(tier, 'Unknown')})")
-
+        if filesystem or shell or observability.get("run_artifact_path"):
+            click.echo("\nCoding/build surfaces:")
+            if filesystem:
+                click.echo(f"  read:  {filesystem.get('read', [])}")
+                click.echo(f"  write: {filesystem.get('write', [])}")
+            if shell:
+                click.echo(f"  shell: {shell.get('commands', [])}")
+            if observability.get("run_artifact_path"):
+                click.echo(f"  verdict artifact: {observability['run_artifact_path']}")
         if recommendations:
             click.echo(f"\nRecommendations to reach Tier {tier + 1}:")
-            for r in recommendations:
-                click.echo(f"  + {r.field}: {r.reason}")
+            for item in recommendations:
+                click.echo(f"  + {item.field}: {item.reason}")
 
     if errors:
         sys.exit(1)
@@ -95,23 +108,30 @@ def check_compat(producer_path: str, consumer_path: str, json_output: bool) -> N
     try:
         producer = load_contract(producer_path)
         consumer = load_contract(consumer_path)
-    except ContractLoadError as e:
-        click.echo(f"Error: {e}", err=True)
+    except ContractLoadError as exc:
+        click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
 
     report = check_compatibility(producer, consumer)
-
     if json_output:
         result = {
             "compatible": report.compatible,
             "producer": report.producer,
             "consumer": report.consumer,
-            "schema_gaps": [{"field": g.field_path, "issue": g.issue} for g in report.schema_gaps],
-            "capability_gaps": [{"tool": g.tool, "reason": g.reason} for g in report.capability_gaps],
+            "schema_gaps": [
+                {"field": gap.field_path, "issue": gap.issue} for gap in report.schema_gaps
+            ],
+            "capability_gaps": [
+                {"tool": gap.tool, "reason": gap.reason} for gap in report.capability_gaps
+            ],
             "budget_gaps": [
-                {"type": g.budget_type, "producer_limit": g.producer_limit,
-                 "consumer_limit": g.consumer_limit, "issue": g.issue}
-                for g in report.budget_gaps
+                {
+                    "type": gap.budget_type,
+                    "producer_limit": gap.producer_limit,
+                    "consumer_limit": gap.consumer_limit,
+                    "issue": gap.issue,
+                }
+                for gap in report.budget_gaps
             ],
             "effect_violations": report.effect_violations,
             "warnings": report.warnings,
@@ -119,44 +139,50 @@ def check_compat(producer_path: str, consumer_path: str, json_output: bool) -> N
         click.echo(json.dumps(result, indent=2))
     else:
         click.echo(report.summary())
-
         if report.schema_gaps:
             click.echo("\nSchema gaps:")
-            for g in report.schema_gaps:
-                click.echo(f"  - {g.field_path}: {g.issue}")
-
+            for gap in report.schema_gaps:
+                click.echo(f"  - {gap.field_path}: {gap.issue}")
         if report.capability_gaps:
             click.echo("\nCapability gaps:")
-            for g in report.capability_gaps:
-                click.echo(f"  - {g.tool}: {g.reason}")
-
+            for capability_gap in report.capability_gaps:
+                click.echo(f"  - {capability_gap.tool}: {capability_gap.reason}")
         if report.budget_gaps:
             click.echo("\nBudget gaps:")
-            for g in report.budget_gaps:
-                click.echo(f"  - {g.issue}")
-
+            for budget_gap in report.budget_gaps:
+                click.echo(f"  - {budget_gap.issue}")
         if report.effect_violations:
             click.echo("\nEffect violations:")
-            for v in report.effect_violations:
-                click.echo(f"  - {v}")
-
+            for violation in report.effect_violations:
+                click.echo(f"  - {violation}")
         if report.warnings:
             click.echo("\nWarnings:")
-            for w in report.warnings:
-                click.echo(f"  - {w}")
+            for warning in report.warnings:
+                click.echo(f"  - {warning}")
 
     if not report.compatible:
         sys.exit(1)
 
 
 @main.command()
-@click.option("--from-trace", "-t", "trace_path", type=click.Path(exists=True),
-              help="JSONL trace file to generate from.")
+@click.option("--from-trace", "-t", "trace_path", type=click.Path(exists=True), help="JSONL trace file to generate from.")
 @click.option("--name", "-n", "agent_name", help="Agent name override.")
 @click.option("--version", "-v", "agent_version", help="Agent version override.")
 @click.option("--output", "-o", "output_path", type=click.Path(), help="Output file path.")
-def init(trace_path: Optional[str], agent_name: Optional[str], agent_version: Optional[str],
-         output_path: Optional[str]) -> None:
+@click.option(
+    "--template",
+    type=click.Choice(["basic", "coding"], case_sensitive=False),
+    default="basic",
+    show_default=True,
+    help="Template to use when not generating from traces.",
+)
+def init(
+    trace_path: Optional[str],
+    agent_name: Optional[str],
+    agent_version: Optional[str],
+    output_path: Optional[str],
+    template: str,
+) -> None:
     """Generate a contract skeleton (optionally from execution traces)."""
     from agent_contracts.init_from_trace import generate_contract_yaml
 
@@ -165,26 +191,73 @@ def init(trace_path: Optional[str], agent_name: Optional[str], agent_version: Op
             trace_path, agent_name=agent_name, agent_version=agent_version
         )
     else:
-        # Generate a minimal template
-        template = {
-            "agent_contract": "0.1.0",
-            "identity": {
-                "name": agent_name or "my-agent",
-                "version": agent_version or "0.1.0",
-                "description": "TODO: Describe what this agent does.",
-            },
-            "contract": {
-                "postconditions": [
-                    {
-                        "name": "produces_output",
-                        "check": "output is not None",
-                        "enforcement": "sync_block",
-                        "severity": "critical",
+        if template == "coding":
+            payload = {
+                "agent_contract": "0.1.0",
+                "identity": {
+                    "name": agent_name or "repo-build-agent",
+                    "version": agent_version or "0.1.0",
+                    "description": "Repo-local coding/build agent with fail-closed scopes.",
+                },
+                "effects": {
+                    "authorized": {
+                        "filesystem": {
+                            "read": ["src/**", "tests/**", "README.md", "pyproject.toml"],
+                            "write": ["src/**", "tests/**", "README.md"],
+                        },
+                        "shell": {
+                            "commands": [
+                                "python -m pytest *",
+                                "python -m ruff check *",
+                            ]
+                        },
+                        "tools": [],
+                        "network": [],
+                        "state_writes": [],
                     }
-                ]
-            },
-        }
-        result = yaml.dump(template, sort_keys=False, default_flow_style=False)
+                },
+                "resources": {
+                    "budgets": {
+                        "max_tokens": 50000,
+                        "max_tool_calls": 20,
+                        "max_shell_commands": 10,
+                        "max_duration_seconds": 1800,
+                    }
+                },
+                "observability": {
+                    "run_artifact_path": ".agent-contracts/runs/{run_id}/verdict.json"
+                },
+                "contract": {
+                    "postconditions": [
+                        {
+                            "name": "repo_checks_green",
+                            "check": "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0",
+                            "enforcement": "sync_block",
+                            "severity": "critical",
+                        }
+                    ]
+                },
+            }
+        else:
+            payload = {
+                "agent_contract": "0.1.0",
+                "identity": {
+                    "name": agent_name or "my-agent",
+                    "version": agent_version or "0.1.0",
+                    "description": "TODO: Describe what this agent does.",
+                },
+                "contract": {
+                    "postconditions": [
+                        {
+                            "name": "produces_output",
+                            "check": "output is not None",
+                            "enforcement": "sync_block",
+                            "severity": "critical",
+                        }
+                    ]
+                },
+            }
+        result = yaml.dump(payload, sort_keys=False, default_flow_style=False)
 
     if output_path:
         Path(output_path).write_text(result, encoding="utf-8")
@@ -193,10 +266,46 @@ def init(trace_path: Optional[str], agent_name: Optional[str], agent_version: Op
         click.echo(result)
 
 
+@main.command("check-verdict")
+@click.argument("verdict_path", type=click.Path(exists=True))
+@click.option("--json-output", "-j", is_flag=True, help="Output as JSON.")
+@click.option("--fail-on-warn", is_flag=True, help="Return non-zero for warn outcomes.")
+def check_verdict(verdict_path: str, json_output: bool, fail_on_warn: bool) -> None:
+    """Inspect a verdict artifact and return a CI-friendly exit code."""
+    verdict = load_verdict_artifact(verdict_path)
+    outcome = verdict.get("outcome", "unknown")
+    final_gate = verdict.get("final_gate", "unknown")
+    should_fail = outcome in {"blocked", "fail"} or (fail_on_warn and outcome == "warn")
+
+    if json_output:
+        click.echo(json.dumps(verdict, indent=2))
+    else:
+        click.echo(f"Outcome: {outcome}")
+        click.echo(f"Final gate: {final_gate}")
+        violations = verdict.get("violations", [])
+        checks = verdict.get("checks", [])
+        if violations:
+            click.echo("\nViolations:")
+            for violation in violations:
+                click.echo(f"  - {violation.get('violated_clause')}")
+        if checks:
+            click.echo("\nChecks:")
+            for check in checks:
+                click.echo(f"  - {check.get('name')}: {check.get('status')}")
+
+    if should_fail:
+        sys.exit(1)
+
+
 @main.command()
 @click.argument("contract_path", type=click.Path(exists=True))
-@click.option("--eval-suite", "-e", "eval_dir", type=click.Path(exists=True),
-              help="Directory containing eval test cases (JSONL).")
+@click.option(
+    "--eval-suite",
+    "-e",
+    "eval_dir",
+    type=click.Path(exists=True),
+    help="Directory containing eval test cases (JSONL).",
+)
 def test(contract_path: str, eval_dir: Optional[str]) -> None:
     """Run eval suite against contract postconditions."""
     from agent_contracts.loader import ContractLoadError, load_contract
@@ -204,15 +313,17 @@ def test(contract_path: str, eval_dir: Optional[str]) -> None:
 
     try:
         contract = load_contract(contract_path)
-    except ContractLoadError as e:
-        click.echo(f"Error loading contract: {e}", err=True)
+    except ContractLoadError as exc:
+        click.echo(f"Error loading contract: {exc}", err=True)
         sys.exit(1)
 
     if not eval_dir:
         click.echo(f"Contract '{contract.identity.name}' loaded (Tier {contract.tier}).")
         click.echo(f"Postconditions: {len(contract.postconditions)}")
-        for pc in contract.postconditions:
-            click.echo(f"  - {pc.name} ({pc.enforcement}): {pc.check}")
+        for postcondition in contract.postconditions:
+            click.echo(
+                f"  - {postcondition.name} ({postcondition.enforcement}): {postcondition.check}"
+            )
         click.echo("\nNo eval suite specified. Use --eval-suite to run tests.")
         return
 
@@ -226,10 +337,10 @@ def test(contract_path: str, eval_dir: Optional[str]) -> None:
     passed = 0
     failed = 0
 
-    for tf in test_files:
-        click.echo(f"\n--- {tf.name} ---")
-        with open(tf, encoding="utf-8") as f:
-            for line_num, line in enumerate(f, 1):
+    for test_file in test_files:
+        click.echo(f"\n--- {test_file.name} ---")
+        with open(test_file, encoding="utf-8") as handle:
+            for line_num, line in enumerate(handle, 1):
                 line = line.strip()
                 if not line:
                     continue
@@ -238,24 +349,24 @@ def test(contract_path: str, eval_dir: Optional[str]) -> None:
                 except json.JSONDecodeError:
                     click.echo(f"  Line {line_num}: SKIP (invalid JSON)")
                     continue
-
                 output = case.get("output", case.get("result"))
                 total += 1
                 try:
-                    results = evaluate_postconditions(
-                        contract.postconditions, output
-                    )
-                    all_passed = all(r.passed for r in results)
-                    if all_passed:
+                    results = evaluate_postconditions(contract.postconditions, output)
+                    if all(result.passed for result in results):
                         passed += 1
                         click.echo(f"  Case {line_num}: PASS")
                     else:
                         failed += 1
-                        failed_names = [r.postcondition.name for r in results if not r.passed]
+                        failed_names = [
+                            result.postcondition.name for result in results if not result.passed
+                        ]
                         click.echo(f"  Case {line_num}: FAIL ({', '.join(failed_names)})")
-                except PostconditionError as e:
+                except PostconditionError as exc:
                     failed += 1
-                    click.echo(f"  Case {line_num}: FAIL (blocked: {e.postcondition.name})")
+                    click.echo(
+                        f"  Case {line_num}: FAIL (blocked: {exc.postcondition.name})"
+                    )
 
     click.echo(f"\nResults: {passed}/{total} passed, {failed} failed")
     if failed > 0:

@@ -100,6 +100,6 @@ class ContractGuard:
             self._enforcer.check_tool_call(tool_name)
             return tool_fn(*args, **kwargs)
 
-        wrapped.__name__ = tool_fn.__name__  # type: ignore[attr-defined]
+        wrapped.__name__ = tool_fn.__name__
         wrapped.__doc__ = tool_fn.__doc__
         return wrapped

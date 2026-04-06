@@ -20,6 +20,7 @@ from agent_contracts.types import (
     EffectsDeclared,
     ErrorDef,
     FailureModel,
+    FilesystemAuthorization,
     LatencySLO,
     MetricDef,
     ObservabilityConfig,
@@ -27,6 +28,7 @@ from agent_contracts.types import (
     PostconditionSLO,
     PreconditionDef,
     ResourceBudgets,
+    ShellAuthorization,
     SLOConfig,
     SubstitutionConfig,
     TracesConfig,
@@ -81,10 +83,25 @@ def _build_postcondition(raw: Dict[str, Any]) -> PostconditionDef:
 
 
 def _build_effects_authorized(raw: Dict[str, Any]) -> EffectsAuthorized:
+    filesystem_raw = raw.get("filesystem")
+    filesystem = None
+    if isinstance(filesystem_raw, dict):
+        filesystem = FilesystemAuthorization(
+            read=filesystem_raw.get("read", []),
+            write=filesystem_raw.get("write", []),
+        )
+
+    shell_raw = raw.get("shell")
+    shell = None
+    if isinstance(shell_raw, dict):
+        shell = ShellAuthorization(commands=shell_raw.get("commands", []))
+
     return EffectsAuthorized(
         tools=raw.get("tools", []),
         network=raw.get("network", []),
         state_writes=raw.get("state_writes", []),
+        filesystem=filesystem,
+        shell=shell,
     )
 
 
@@ -103,6 +120,7 @@ def _build_budgets(raw: Dict[str, Any]) -> ResourceBudgets:
         max_tokens=budgets.get("max_tokens"),
         max_tool_calls=budgets.get("max_tool_calls"),
         max_duration_seconds=budgets.get("max_duration_seconds"),
+        max_shell_commands=budgets.get("max_shell_commands"),
     )
 
 
@@ -148,7 +166,12 @@ def _build_observability(raw: Dict[str, Any]) -> ObservabilityConfig:
     ]
     ve_raw = raw.get("violation_events")
     ve = ViolationEventsConfig(**ve_raw) if isinstance(ve_raw, dict) else None
-    return ObservabilityConfig(traces=traces, metrics=metrics, violation_events=ve)
+    return ObservabilityConfig(
+        traces=traces,
+        metrics=metrics,
+        violation_events=ve,
+        run_artifact_path=raw.get("run_artifact_path"),
+    )
 
 
 def _build_versioning(raw: Dict[str, Any]) -> VersioningConfig:
@@ -211,14 +234,15 @@ def load_contract(source: Union[str, Path], *, strict: bool = True) -> Contract:
     contract_raw = data.get("contract", {})
     postconditions = [_build_postcondition(p) for p in contract_raw.get("postconditions", [])]
 
-    # Tier 1 fields
     inputs_raw = data.get("inputs")
     input_schema = inputs_raw.get("schema") if isinstance(inputs_raw, dict) else None
     preconditions = None
     if isinstance(inputs_raw, dict) and "preconditions" in inputs_raw:
         preconditions = [
             PreconditionDef(
-                name=p["name"], check=p["check"], description=p.get("description")
+                name=p["name"],
+                check=p["check"],
+                description=p.get("description"),
             )
             for p in inputs_raw["preconditions"]
         ]
@@ -238,7 +262,6 @@ def load_contract(source: Union[str, Path], *, strict: bool = True) -> Contract:
     resources_raw = data.get("resources")
     budgets = _build_budgets(resources_raw) if isinstance(resources_raw, dict) else None
 
-    # Tier 2 fields
     fm_raw = data.get("failure_model")
     failure_model = _build_failure_model(fm_raw) if isinstance(fm_raw, dict) else None
 
@@ -270,5 +293,6 @@ def load_contract(source: Union[str, Path], *, strict: bool = True) -> Contract:
         observability=observability,
         versioning=versioning,
         slo=slo,
+        source_path=str(Path(source).resolve()),
         raw=data,
     )

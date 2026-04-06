@@ -1,4 +1,4 @@
-"""OpenAI Agents SDK adapter — contract enforcement via RunHooks.
+"""OpenAI Agents SDK adapter — repo-local contract enforcement via RunHooks.
 
 Usage (3 lines):
     from agent_contracts.adapters.openai_agents import ContractRunHooks

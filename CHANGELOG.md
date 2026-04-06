@@ -1,47 +1,20 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are tracked here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [0.1.1] - 2026-03-26
+## [0.2.0] - 2026-04-02
 
 ### Added
 
-- **OpenAI Agents SDK Adapter** — `ContractRunHooks(RunHooks)` for effect gating via `on_tool_start`, token tracking via `on_llm_end`, postcondition evaluation via `on_agent_end`. Pinned to `openai-agents==0.8.4`
-- **Claude Agent SDK Adapter** — `ContractHooks` with structured deny via PreToolUse (not exception). Cost/token extraction from ResultMessage. Pinned to `claude-agent-sdk==0.1.50` (Python 3.10+)
-- **Precondition Evaluation** — `contract.preconditions[]` evaluated on input BEFORE agent runs. Reuses CEL-like expression evaluator. `PreconditionError` blocks execution before tokens are spent. Wired into `ContractEnforcer.check_preconditions()` and `@enforce_contract` decorator
-- **GitHub Action** — `pyyush/agentcontracts@v0.1.1` composite action for CI contract validation
-- **README Badge** — PyPI version and CI status badges
-- 35 new tests (188 total)
+- repo-local coding/build-agent positioning across the README, spec, examples, and canonical contract
+- filesystem read/write authorization scopes
+- shell command authorization scopes
+- shell-command budgets
+- verdict artifact emission and CLI verdict gating
+- coding-agent trace bootstrap improvements
+- coding/build-focused demo contracts and CI action semantics
 
-## [0.1.0] - 2026-03-25
+### Changed
 
-First release. YAML spec + Python SDK for production agent reliability.
-
-### Added
-
-- **YAML Spec Schema** — JSON Schema (Draft 2020-12) covering 3 graduated tiers:
-  - Tier 0 (Standalone): identity + postconditions (4 fields to start)
-  - Tier 1 (Enforceable): + input/output schemas, effects authorization, budgets
-  - Tier 2 (Composable): + failure model, delegation, observability, SLOs
-- **Contract Loading** — YAML parsing, schema validation, tier assessment, upgrade recommendations
-- **Effect Authorization** — Default-deny tool gating with glob pattern matching. Effects split: `authorized` (intersection during delegation) vs `declared` (union for audit)
-- **Budget Enforcement** — Thread-safe circuit breaker for cost, tokens, tool calls, and elapsed time. Raises `BudgetExceededError` when thresholds are hit
-- **Postcondition Evaluator** — Safe CEL-like expression evaluator (no `eval()`). Supports `is None`, comparisons, membership tests, `len()`. Three enforcement timings: `sync_block`, `sync_warn`, `async_monitor`
-- **Violation Events** — OTel-compatible structured events with contract_id, violated_clause, evidence, severity, and trace context. Emits to stdout, OpenTelemetry SDK, or callback
-- **Runtime Enforcer** — Unified middleware wiring effects, budgets, postconditions, and violations. Works as decorator (`@enforce_contract`), context manager, or explicit API
-- **Composition Checker** — Contract Differential analysis: schema gaps, capability gaps, budget gaps, effect violations between producer/consumer contracts
-- **CLI** — Four commands:
-  - `aicontracts validate` — schema validation + tier + recommendations
-  - `aicontracts check-compat` — composition compatibility check
-  - `aicontracts init --from-trace` — generate contract skeleton from JSONL traces
-  - `aicontracts test --eval-suite` — run eval suite against postconditions
-- **Framework Adapters** — LangChain (`ContractCallbackHandler`), CrewAI (`ContractGuard`), Pydantic AI (`ContractMiddleware`). Each under 200 lines, 3-line integration
-- **MCP Extension Proposal** — `x-agent-contract` for tool-level preconditions, effect declarations, and trust metadata
-- **Specification** — Human-readable spec narrative (`SPECIFICATION.md`)
-- **Examples** — Reference contracts for all 3 tiers
-
-[0.1.1]: https://github.com/pyyush/agentcontracts/releases/tag/v0.1.1
-[0.1.0]: https://github.com/pyyush/agentcontracts/releases/tag/v0.1.0
+- promoted the coding/build-agent guardrail work into the v0.2.0 release line
+- clarified Claude/Codex/OpenAI integration limits around hard stops vs final CI gating

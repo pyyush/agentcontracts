@@ -40,16 +40,13 @@ class TestLoadContractYaml:
 
 class TestValidateContract:
     def test_valid_tier0(self, tier0_data: Dict[str, Any]) -> None:
-        errors = validate_contract(tier0_data)
-        assert errors == []
+        assert validate_contract(tier0_data) == []
 
     def test_valid_tier1(self, tier1_data: Dict[str, Any]) -> None:
-        errors = validate_contract(tier1_data)
-        assert errors == []
+        assert validate_contract(tier1_data) == []
 
     def test_valid_tier2(self, tier2_data: Dict[str, Any]) -> None:
-        errors = validate_contract(tier2_data)
-        assert errors == []
+        assert validate_contract(tier2_data) == []
 
     def test_missing_identity(self) -> None:
         data = {
@@ -57,7 +54,7 @@ class TestValidateContract:
             "contract": {"postconditions": [{"name": "x", "check": "true"}]},
         }
         errors = validate_contract(data)
-        assert any("identity" in e for e in errors)
+        assert any("identity" in error for error in errors)
 
     def test_missing_postconditions(self) -> None:
         data = {
@@ -66,7 +63,7 @@ class TestValidateContract:
             "contract": {"postconditions": []},
         }
         errors = validate_contract(data)
-        assert any("postconditions" in e for e in errors)
+        assert any("postconditions" in error for error in errors)
 
     def test_invalid_version_format(self) -> None:
         data = {
@@ -75,18 +72,16 @@ class TestValidateContract:
             "contract": {"postconditions": [{"name": "x", "check": "true"}]},
         }
         errors = validate_contract(data)
-        assert any("agent_contract" in e for e in errors)
+        assert any("agent_contract" in error for error in errors)
 
     def test_x_extension_allowed(self, tier0_data: Dict[str, Any]) -> None:
         tier0_data["x-custom-field"] = {"hello": "world"}
-        errors = validate_contract(tier0_data)
-        assert errors == []
+        assert validate_contract(tier0_data) == []
 
 
 class TestLoadContract:
     def test_load_tier0(self, tmp_yaml, tier0_data: Dict[str, Any]) -> None:
-        path = tmp_yaml(tier0_data)
-        contract = load_contract(path)
+        contract = load_contract(tmp_yaml(tier0_data))
         assert contract.tier == 0
         assert contract.identity.name == "test-agent"
         assert contract.identity.version == "1.0.0"
@@ -94,17 +89,20 @@ class TestLoadContract:
         assert contract.postconditions[0].name == "has_output"
 
     def test_load_tier1(self, tmp_yaml, tier1_data: Dict[str, Any]) -> None:
-        path = tmp_yaml(tier1_data)
-        contract = load_contract(path)
+        contract = load_contract(tmp_yaml(tier1_data))
         assert contract.tier == 1
         assert contract.budgets is not None
         assert contract.budgets.max_cost_usd == 0.50
+        assert contract.budgets.max_shell_commands == 5
         assert contract.effects_authorized is not None
         assert "search" in contract.effects_authorized.tools
+        assert contract.effects_authorized.filesystem is not None
+        assert contract.effects_authorized.filesystem.write == ["src/**", "tests/**"]
+        assert contract.effects_authorized.shell is not None
+        assert "python -m pytest *" in contract.effects_authorized.shell.commands
 
     def test_load_tier2(self, tmp_yaml, tier2_data: Dict[str, Any]) -> None:
-        path = tmp_yaml(tier2_data)
-        contract = load_contract(path)
+        contract = load_contract(tmp_yaml(tier2_data))
         assert contract.tier == 2
         assert contract.failure_model is not None
         assert len(contract.failure_model.errors) == 2
@@ -114,6 +112,13 @@ class TestLoadContract:
         assert contract.slo is not None
         assert contract.slo.contract_satisfaction_rate is not None
         assert contract.slo.contract_satisfaction_rate.target == 0.995
+        assert contract.observability is not None
+        assert contract.observability.run_artifact_path == ".agent-contracts/runs/{run_id}/verdict.json"
+
+    def test_source_path_preserved(self, tmp_yaml, tier0_data: Dict[str, Any]) -> None:
+        path = tmp_yaml(tier0_data)
+        contract = load_contract(path)
+        assert contract.source_path == str(path.resolve())
 
     def test_strict_validation_raises(self, tmp_yaml) -> None:
         bad_data = {"agent_contract": "bad", "identity": {"name": "a"}}
@@ -127,13 +132,11 @@ class TestLoadContract:
             "identity": {"name": "partial", "version": "0.0.1"},
             "contract": {"postconditions": [{"name": "x", "check": "true"}]},
         }
-        path = tmp_yaml(partial)
-        contract = load_contract(path, strict=False)
+        contract = load_contract(tmp_yaml(partial), strict=False)
         assert contract.identity.name == "partial"
 
     def test_raw_preserved(self, tmp_yaml, tier0_data: Dict[str, Any]) -> None:
         tier0_data["x-custom"] = "value"
-        path = tmp_yaml(tier0_data)
-        contract = load_contract(path)
+        contract = load_contract(tmp_yaml(tier0_data))
         assert contract.raw is not None
         assert contract.raw["x-custom"] == "value"
