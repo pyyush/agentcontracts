@@ -232,8 +232,6 @@ def init(
                         {
                             "name": "repo_checks_green",
                             "check": "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0",
-                            "enforcement": "sync_block",
-                            "severity": "critical",
                         }
                     ]
                 },
@@ -251,8 +249,6 @@ def init(
                         {
                             "name": "produces_output",
                             "check": "output is not None",
-                            "enforcement": "sync_block",
-                            "severity": "critical",
                         }
                     ]
                 },

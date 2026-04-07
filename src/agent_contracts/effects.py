@@ -18,6 +18,30 @@ from agent_contracts.types import (
     ShellAuthorization,
 )
 
+# Shell metacharacters that enable command chaining, redirection, or
+# substitution. Any command containing one of these is rejected outright
+# in v0.2.x, regardless of pattern match. The fail-closed contract has
+# no safe way to express "this prefix is allowed but only without an
+# appended `; rm -rf /`" using fnmatch globs, because `*` would consume
+# the operator and the payload as ordinary characters.
+#
+# v0.3.x will introduce a shlex-based token matcher that can express
+# richer command shapes safely; until then, strict reject is the only
+# correct fail-closed behavior.
+_SHELL_METACHARS = frozenset(";&|<>`\n")
+_SHELL_METASEQUENCES = ("$(",)
+
+
+def _shell_metachar_in(command: str) -> Optional[str]:
+    """Return the first shell metacharacter found, or None."""
+    for ch in command:
+        if ch in _SHELL_METACHARS:
+            return ch
+    for seq in _SHELL_METASEQUENCES:
+        if seq in command:
+            return seq
+    return None
+
 
 class EffectDeniedError(Exception):
     """Raised when a tool call or effect is not authorized."""
@@ -29,6 +53,29 @@ class EffectDeniedError(Exception):
         super().__init__(
             f"{effect_type} '{name}' denied. "
             f"Authorized: {list(allowed) if allowed else '(none — default deny)'}"
+        )
+
+
+class ShellMetacharacterError(EffectDeniedError):
+    """Raised when a shell command contains a chaining/redirection/
+    substitution metacharacter. Distinct from a plain authorization
+    failure so callers and verdict artifacts can distinguish 'matched
+    no allowlist entry' from 'attempted to chain commands'."""
+
+    def __init__(self, command: str, metachar: str, allowed: Sequence[str]) -> None:
+        self.metachar = metachar
+        self.command = command
+        super().__init__(
+            "shell.command",
+            command,
+            allowed,
+        )
+        # Override the message to surface the bypass attempt explicitly.
+        self.args = (
+            f"shell.command '{command}' rejected: contains shell metacharacter "
+            f"'{metachar}'. Command chaining, redirection, and substitution are "
+            f"not permitted under v0.2.x effect authorization. "
+            f"Authorized patterns: {list(allowed) if allowed else '(none)'}",
         )
 
 
@@ -109,8 +156,20 @@ class EffectGuard:
     def check_shell_command(self, command: str) -> bool:
         if self._authorized is None or self._authorized.shell is None:
             return True
+        # Strict reject: any chaining/redirection/substitution metachar
+        # bypasses fnmatch's `*` and would let an attacker append payloads
+        # after an allowlisted prefix. Scan the RAW command (not the
+        # whitespace-normalized form) so newlines are not lost.
+        if _shell_metachar_in(command) is not None:
+            return False
         normalized = self._normalized_command(command)
         return matches_any(normalized, self._authorized.shell.commands)
+
+    def shell_command_metachar(self, command: str) -> Optional[str]:
+        """Return the first shell metacharacter in the command, or None.
+        Exposed so callers can distinguish 'unauthorized' from 'rejected
+        as a chaining attempt' when constructing verdicts."""
+        return _shell_metachar_in(command)
 
     def require_tool(self, tool_name: str) -> None:
         if not self.check_tool(tool_name):
@@ -152,10 +211,14 @@ class EffectGuard:
 
     def require_shell_command(self, command: str) -> None:
         if not self.check_shell_command(command):
-            allowed = []
+            allowed: List[str] = []
             if self._authorized is not None and self._authorized.shell is not None:
-                allowed = self._authorized.shell.commands
-            raise EffectDeniedError("shell.command", self._normalized_command(command), allowed)
+                allowed = list(self._authorized.shell.commands)
+            metachar = _shell_metachar_in(command)
+            normalized = self._normalized_command(command)
+            if metachar is not None:
+                raise ShellMetacharacterError(normalized, metachar, allowed)
+            raise EffectDeniedError("shell.command", normalized, allowed)
 
 
 def intersect_authorized(parent: EffectsAuthorized, child: EffectsAuthorized) -> EffectsAuthorized:

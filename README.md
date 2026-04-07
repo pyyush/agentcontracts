@@ -1,58 +1,58 @@
-# Agent Contracts
+# agent-contracts
 
 [![CI](https://github.com/pyyush/agentcontracts/actions/workflows/ci.yml/badge.svg)](https://github.com/pyyush/agentcontracts/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/aicontracts.svg)](https://pypi.org/project/aicontracts/)
 
-**Repo-local, fail-closed guardrails for autonomous coding/build agents.**
+**Declare what your coding agent may read, write, run, and spend — in one YAML file at the root of your repo. Enforced at runtime. Gated in CI. Fails closed.**
 
-`agent-contracts` lets a repository declare what an agent may read, write, run, call, and spend — and then emit one durable verdict artifact showing whether the run passed, warned, blocked, or failed.
-
-The contract, CLI, verdict artifact, and GitHub Action are **framework-agnostic and provider-agnostic by design** — they don't depend on any agent SDK or model provider. Optional adapters for Claude Agent SDK, OpenAI Agents SDK, and LangChain are thin ergonomic helpers that forward in-runtime hook calls into the same enforcer.
-
-> **The CI verdict gate is the source of truth.** The merge cannot go green if the verdict is `blocked` or `fail`. In-runtime adapters add convenience — the gate is what makes enforcement complete.
+Works with Claude Code, Codex, Cursor, and any agent runtime — the core is framework- and provider-agnostic. Optional thin adapters for Claude Agent SDK, OpenAI Agents SDK, and LangChain.
 
 ```bash
 pip install aicontracts
+aicontracts init --template coding -o AGENT_CONTRACT.yaml
+aicontracts validate AGENT_CONTRACT.yaml
 ```
 
-## What it solves
+> **The CI verdict gate is the source of truth.** Every run emits one durable `verdict.json`. The merge cannot go green if the verdict is `blocked` or `fail`. In-runtime adapters add convenience — the gate is what makes enforcement complete.
 
-Without a repo-local contract, coding agents usually run with ambient authority.
-That creates five common failure modes:
+## Why this, why now
 
-- edits outside the intended file scope
-- forbidden shell commands
-- unauthorized tool or network calls
-- silent budget overruns
-- fake green runs when repo checks are red
+Coding agents are in production. Claude Code, Codex, Cursor Agent, Devin, Aider — every one of them runs with ambient authority over your repo: whatever the shell, filesystem, and network will let them do. The failure modes are no longer hypothetical:
 
-Agent Contracts keeps the scope narrow:
+- agents editing files outside the intended scope
+- destructive shell commands run on the wrong branch
+- silent token-budget overruns mid-loop
+- the agent reports "all tests passing" while `pytest` on disk is red — and you merge it
+- unauthorized network calls and tool use buried in the trace
 
-> declare the repo-local contract, enforce it at runtime and in CI, and fail closed with a verdict artifact.
+A repo shouldn't trust an agent any more than it trusts a random PR. `agent-contracts` is the smallest thing that gives a repo a declarative *"here is exactly what this agent may do"* — and a CI gate that refuses to merge runs that violated it.
 
-## 5-minute quick start
+## What an agent cannot do under a contract
 
-### 1. Write a coding-agent contract
+| Agent attempts | Without a contract | With agent-contracts |
+|---|---|---|
+| `Write(".env", ...)` | silently succeeds | not in `filesystem.write` → denied |
+| `Bash("rm -rf node_modules")` | runs | not in `shell.commands` → denied |
+| `Bash("python -m pytest tests/ ; rm -rf /")` | runs | shell metacharacter → denied |
+| Fetches `https://evil.example.com` | runs | not in `network` → denied |
+| Burns 200k tokens in a loop | silent | hits `max_tokens: 50000` → blocked |
+| Reports "all tests passing" while pytest is red | merges green | postcondition fails → verdict: `fail`, CI gate red |
+
+## Quick start
+
+### 1. Generate a starter contract
+
+```bash
+aicontracts init --template coding -o AGENT_CONTRACT.yaml
+```
+
+This drops a ready-to-use coding-agent contract in your repo:
 
 ```yaml
-# AGENT_CONTRACT.yaml
 agent_contract: "0.1.0"
-
 identity:
   name: repo-build-agent
   version: "0.1.0"
-  description: Safe coding/build agent for this repository.
-
-contract:
-  postconditions:
-    - name: produces_output
-      check: "output is not None"
-      enforcement: sync_block
-      severity: critical
-
-    - name: repo_checks_green
-      check: "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0"
-      enforcement: sync_block
-      severity: critical
 
 effects:
   authorized:
@@ -76,36 +76,46 @@ resources:
 
 observability:
   run_artifact_path: ".agent-contracts/runs/{run_id}/verdict.json"
+
+contract:
+  postconditions:
+    - name: repo_checks_green
+      check: "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0"
 ```
 
-### 2. Enforce it in the agent runtime
+Empty `tools`, `network`, and `state_writes` lists mean *default-deny*: the agent cannot use any tool, hit any network endpoint, or write to any tracked state unless you list it.
+
+### 2. Hook it into your agent runtime
+
+The Claude Agent SDK adapter forwards every tool call into the enforcer — no manual instrumentation:
 
 ```python
-from agent_contracts import ContractEnforcer, load_contract
+from agent_contracts import load_contract
+from agent_contracts.adapters.claude_agent import ContractHooks
+from claude_agent_sdk import ClaudeAgentOptions, query
 
 contract = load_contract("AGENT_CONTRACT.yaml")
+hooks = ContractHooks(contract)
 
-with ContractEnforcer(contract, host_name="codex") as enforcer:
-    enforcer.check_file_read("src/app.py")
-    enforcer.check_file_write("src/app.py")
-    enforcer.check_shell_command("python -m pytest tests/test_app.py")
+options = ClaudeAgentOptions(hooks=hooks.get_hooks_config())
+async for message in query(prompt="refactor src/app.py", options=options):
+    if hasattr(message, "total_cost_usd"):
+        hooks.track_result(message)
 
-    result = {"status": "done"}
-
-    enforcer.record_check("pytest", "pass", exit_code=0)
-    enforcer.record_check("ruff", "pass", exit_code=0)
-    verdict = enforcer.finalize_run(output=result)
-
-print(verdict.outcome)      # pass | warn | blocked | fail
-print(verdict.artifacts)    # includes verdict artifact path
+verdict = hooks.enforcer.finalize_run(output={"status": "done"})
+print(verdict.outcome)  # pass | warn | blocked | fail
 ```
+
+OpenAI Agents SDK and LangChain adapters follow the same pattern. For agents *without* an SDK hook surface (bash drivers, custom subprocess loops), the verdict gate in step 3 still catches every violation post-hoc.
 
 ### 3. Gate the verdict in CI
 
 ```bash
-python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
-python -m agent_contracts.cli check-verdict .agent-contracts/runs/<run-id>/verdict.json
+aicontracts validate AGENT_CONTRACT.yaml
+aicontracts check-verdict .agent-contracts/runs/<run-id>/verdict.json
 ```
+
+`check-verdict` exits non-zero on `blocked` or `fail`. Wire it into a required GitHub check and the merge cannot proceed without an honest contract pass.
 
 ## Verdict artifacts
 
@@ -115,14 +125,12 @@ Every meaningful run can emit one compact artifact, for example:
 {
   "run_id": "...",
   "outcome": "pass",
-  "final_gate": "allowed",
   "checks": [
     {"name": "pytest", "status": "pass", "exit_code": 0},
     {"name": "ruff", "status": "pass", "exit_code": 0}
   ],
   "budgets": {
     "tokens": 12345,
-    "tool_calls": 0,
     "shell_commands": 2,
     "duration_seconds": 18.2
   },
@@ -141,19 +149,19 @@ Outcome semantics:
 
 ```bash
 # Validate a contract and show coding/build surfaces
-python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
-
-# Check composition compatibility
-python -m agent_contracts.cli check-compat producer.yaml consumer.yaml
-
-# Bootstrap from traces
-python -m agent_contracts.cli init --from-trace traces.jsonl -o AGENT_CONTRACT.yaml
+aicontracts validate AGENT_CONTRACT.yaml
 
 # Generate a coding-agent starter template
-python -m agent_contracts.cli init --template coding
+aicontracts init --template coding -o AGENT_CONTRACT.yaml
 
-# Gate a verdict artifact in CI
-python -m agent_contracts.cli check-verdict .agent-contracts/runs/<run-id>/verdict.json
+# Bootstrap from traces
+aicontracts init --from-trace traces.jsonl -o AGENT_CONTRACT.yaml
+
+# Check composition compatibility
+aicontracts check-compat producer.yaml consumer.yaml
+
+# Gate a verdict artifact in CI (exits non-zero on blocked/fail)
+aicontracts check-verdict .agent-contracts/runs/<run-id>/verdict.json
 ```
 
 ## Framework adapters (optional)
@@ -173,6 +181,19 @@ In-runtime adapters add hard-stop coverage where the host exposes a pre-executio
 ### v0.3.0 roadmap
 
 A companion `@aicontracts/*` TypeScript package with adapters for Vercel AI SDK, Claude TypeScript SDK, and OpenAI Agents JS is planned for v0.3.0.
+
+## Shell command matching: threat model
+
+Shell command authorization in v0.2.x is **strict reject + glob match**. Any command containing a shell metacharacter — `;` `&` `|` `<` `>` `` ` `` `$(` or a newline — is denied outright, even if its prefix matches an allowlisted pattern. This rules out command chaining, redirection, process substitution, and command injection at the contract layer.
+
+```yaml
+shell:
+  commands:
+    - "python -m pytest *"   # matches: python -m pytest tests/test_app.py
+                              # denied:  python -m pytest tests/ ; rm -rf /
+```
+
+The trade-off: legitimate piped commands like `cat file | head` cannot be expressed as a single allowlist entry today. Wrap them in a script the contract authorizes by name, or split them into two records. v0.3.x will introduce a `shlex`-based token matcher that can express richer command shapes safely without weakening the fail-closed property.
 
 ## GitHub Action
 

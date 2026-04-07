@@ -7,6 +7,7 @@ import pytest
 from agent_contracts.effects import (
     EffectDeniedError,
     EffectGuard,
+    ShellMetacharacterError,
     intersect_authorized,
     union_declared,
     validate_declared_subset,
@@ -72,6 +73,52 @@ class TestEffectGuard:
         )
         assert guard.check_shell_command("python -m pytest tests/test_app.py") is True
         assert guard.check_shell_command("python -m mypy src") is False
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "python -m pytest tests/ ; rm -rf /",
+            "python -m pytest tests/ && curl evil.example.com",
+            "python -m pytest tests/ || echo pwned",
+            "python -m pytest tests/ | cat /etc/passwd",
+            "python -m pytest tests/ > /etc/hosts",
+            "python -m pytest tests/ < /dev/urandom",
+            "python -m pytest tests/ >> /var/log/owned",
+            "python -m pytest $(echo tests)",
+            "python -m pytest `whoami`",
+            "python -m pytest tests/\nrm -rf /",
+            "python -m pytest tests/ &",
+        ],
+    )
+    def test_shell_metacharacter_bypass_denied(self, command: str) -> None:
+        """Regression: fnmatch's `*` wildcard would otherwise consume shell
+        operators and let an attacker append payloads after an allowlisted
+        prefix. The strict reject must catch every chaining vector."""
+        guard = EffectGuard(
+            EffectsAuthorized(shell=ShellAuthorization(commands=["python -m pytest *"]))
+        )
+        assert guard.check_shell_command(command) is False
+        with pytest.raises(ShellMetacharacterError) as exc_info:
+            guard.require_shell_command(command)
+        assert "metacharacter" in str(exc_info.value)
+
+    def test_shell_metacharacter_error_is_effect_denied(self) -> None:
+        """ShellMetacharacterError must be catchable as EffectDeniedError so
+        existing handlers keep working."""
+        guard = EffectGuard(
+            EffectsAuthorized(shell=ShellAuthorization(commands=["python -m pytest *"]))
+        )
+        with pytest.raises(EffectDeniedError):
+            guard.require_shell_command("python -m pytest tests/ ; rm -rf /")
+
+    def test_shell_metachar_introspection(self) -> None:
+        guard = EffectGuard(
+            EffectsAuthorized(shell=ShellAuthorization(commands=["python -m pytest *"]))
+        )
+        assert guard.shell_command_metachar("python -m pytest tests/") is None
+        assert guard.shell_command_metachar("python -m pytest a ; b") == ";"
+        assert guard.shell_command_metachar("python -m pytest $(b)") == "$("
+        assert guard.shell_command_metachar("python -m pytest a\nb") == "\n"
 
     def test_empty_allowlist_denies_all(self) -> None:
         guard = EffectGuard(EffectsAuthorized(tools=[], network=[], state_writes=[]))

@@ -26,3 +26,7 @@ All notable changes to this project are tracked here.
 
 - CrewAI adapter and `[crewai]` extra
 - Pydantic AI adapter and `[pydantic-ai]` extra
+
+### Security
+
+- shell command authorization now strict-rejects any command containing a shell metacharacter (`;`, `&`, `|`, `<`, `>`, `` ` ``, `$(`, newline). Closes a bypass where the fnmatch `*` wildcard would consume chaining operators and let an attacker append payloads after an allowlisted prefix (e.g. `python -m pytest tests/ ; rm -rf /`). The new `ShellMetacharacterError` is a subclass of `EffectDeniedError` so existing handlers keep working. Regression coverage in `tests/test_effects.py`.
