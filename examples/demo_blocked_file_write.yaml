@@ -1,0 +1,24 @@
+agent_contract: "0.1.0"
+
+identity:
+  name: blocked-file-write-demo
+  version: "0.1.0"
+
+contract:
+  postconditions:
+    - name: produces_output
+      check: "output is not None"
+      enforcement: sync_block
+      severity: critical
+
+effects:
+  authorized:
+    filesystem:
+      read: ["src/**", "tests/**"]
+      write: ["src/**"]
+    tools: []
+    network: []
+    state_writes: []
+
+observability:
+  run_artifact_path: ".agent-contracts/runs/{run_id}/verdict.json"

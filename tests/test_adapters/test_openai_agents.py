@@ -101,3 +101,32 @@ class TestContractRunHooks:
 
     def test_on_llm_start(self, hooks) -> None:
         run_async(hooks.on_llm_start(None, None, None, None))
+
+
+class TestRealSDKIntegration:
+    """Verifies the adapter is a real subclass of the installed SDK's
+    RunHooks base class. Skipped if openai-agents is not installed."""
+
+    def test_subclass_of_real_runhooks(self, hooks) -> None:
+        # agents.RunHooks is a parameterized generic alias
+        # (RunHooksBase[TContext, Agent]); the actual base class lives in
+        # agents.lifecycle and is what the adapter must subclass.
+        pytest.importorskip("agents")
+        from agents.lifecycle import RunHooksBase
+        assert issubclass(ContractRunHooks, RunHooksBase)
+        assert isinstance(hooks, RunHooksBase)
+
+    def test_hook_method_signatures_present(self) -> None:
+        pytest.importorskip("agents")
+        from agents.lifecycle import RunHooksBase
+        for name in (
+            "on_tool_start",
+            "on_tool_end",
+            "on_llm_start",
+            "on_llm_end",
+            "on_agent_start",
+            "on_agent_end",
+            "on_handoff",
+        ):
+            assert hasattr(RunHooksBase, name), f"SDK is missing {name}"
+            assert hasattr(ContractRunHooks, name), f"adapter is missing {name}"

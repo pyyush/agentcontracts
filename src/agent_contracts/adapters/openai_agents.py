@@ -1,4 +1,4 @@
-"""OpenAI Agents SDK adapter — contract enforcement via RunHooks.
+"""OpenAI Agents SDK adapter — repo-local contract enforcement via RunHooks.
 
 Usage (3 lines):
     from agent_contracts.adapters.openai_agents import ContractRunHooks
@@ -23,7 +23,7 @@ from agent_contracts.types import Contract
 from agent_contracts.violations import ViolationEvent
 
 try:
-    from openai_agents import RunHooks
+    from agents import RunHooks
 except ImportError:
     # Stub so the module can be imported without openai-agents
     class RunHooks:  # type: ignore[no-redef]

@@ -17,9 +17,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
+      - name: Install core (3.9)
+        if: matrix.python-version == '3.9'
         run: pip install -e ".[dev]"
+      - name: Install core + adapter extras (3.10+)
+        if: matrix.python-version != '3.9'
+        run: pip install -e ".[dev,claude,openai,langchain]"
       - name: Lint
         run: python -m ruff check src/ tests/
+      - name: Type check
+        run: python -m mypy src/agent_contracts
       - name: Test
         run: python -m pytest --cov=agent_contracts --cov-report=term-missing
+      - name: Validate canonical contracts
+        run: |
+          python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
+          python -m agent_contracts.cli validate examples/support_triage.yaml

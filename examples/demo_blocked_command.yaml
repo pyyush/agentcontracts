@@ -1,0 +1,29 @@
+agent_contract: "0.1.0"
+
+identity:
+  name: blocked-command-demo
+  version: "0.1.0"
+
+contract:
+  postconditions:
+    - name: produces_output
+      check: "output is not None"
+      enforcement: sync_block
+      severity: critical
+
+effects:
+  authorized:
+    shell:
+      commands:
+        - "python -m pytest *"
+        - "python -m ruff check *"
+    tools: []
+    network: []
+    state_writes: []
+
+resources:
+  budgets:
+    max_shell_commands: 3
+
+observability:
+  run_artifact_path: ".agent-contracts/runs/{run_id}/verdict.json"

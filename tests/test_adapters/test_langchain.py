@@ -61,3 +61,18 @@ class TestContractCallbackHandler:
 
     def test_on_tool_end(self, handler) -> None:
         handler.on_tool_end("result")  # No-op, should not raise
+
+
+class TestRealSDKIntegration:
+    """Verifies the adapter is a real subclass of the installed
+    langchain-core BaseCallbackHandler. Skipped if langchain-core absent."""
+
+    def test_subclass_of_real_base_callback_handler(self, handler) -> None:
+        callbacks = pytest.importorskip("langchain_core.callbacks")
+        assert isinstance(handler, callbacks.BaseCallbackHandler)
+
+    def test_hook_method_signatures_present(self) -> None:
+        callbacks = pytest.importorskip("langchain_core.callbacks")
+        for name in ("on_tool_start", "on_tool_end", "on_chain_end", "on_llm_end"):
+            assert hasattr(callbacks.BaseCallbackHandler, name), f"SDK missing {name}"
+            assert hasattr(ContractCallbackHandler, name), f"adapter missing {name}"

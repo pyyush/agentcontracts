@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "aicontracts"
 dynamic = ["version"]
-description = "YAML spec + validation SDK for production agent reliability — cost control, tool-use security, and audit trails."
+description = "Repo-local, fail-closed guardrails for autonomous coding/build agents."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.9"
@@ -25,9 +25,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 keywords = [
-    "agent", "contracts", "llm", "safety", "validation", "mcp",
-    "ai-agents", "guardrails", "governance", "compliance", "observability",
-    "opentelemetry", "budget", "cost-control", "tool-use", "audit",
+    "agent", "contracts", "coding-agent", "build-agent", "guardrails", "repo-local",
+    "fail-closed", "budgets", "tool-use", "filesystem", "shell", "ci",
 ]
 dependencies = [
     "pyyaml>=6.0",
@@ -37,16 +36,12 @@ dependencies = [
 
 [project.optional-dependencies]
 otel = ["opentelemetry-api>=1.20"]
-langchain = ["langchain-core>=0.2"]
-crewai = ["crewai>=0.50"]
-pydantic-ai = ["pydantic-ai>=0.1"]
-openai = ["openai-agents==0.8.4"]
-claude = ["claude-agent-sdk==0.1.50; python_version>='3.10'"]
+langchain = ["langchain-core==1.2.26; python_version>='3.10'"]
+openai = ["openai-agents==0.13.5; python_version>='3.10'"]
+claude = ["claude-agent-sdk==0.1.56; python_version>='3.10'"]
 all = [
     "aicontracts[otel]",
     "aicontracts[langchain]",
-    "aicontracts[crewai]",
-    "aicontracts[pydantic-ai]",
     "aicontracts[openai]",
     "aicontracts[claude]",
 ]
@@ -96,3 +91,30 @@ python_version = "3.9"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "yaml",
+    "jsonschema",
+    "jsonschema.*",
+    "opentelemetry",
+    "opentelemetry.*",
+]
+ignore_missing_imports = true
+
+# Framework SDKs may use newer-Python syntax (e.g. match statements) than
+# the project's mypy target. Skip following imports into them so the
+# adapter modules type-check against forward references only.
+[[tool.mypy.overrides]]
+module = [
+    "agents",
+    "agents.*",
+    "langchain_core",
+    "langchain_core.*",
+    "claude_agent_sdk",
+    "claude_agent_sdk.*",
+    "mcp",
+    "mcp.*",
+]
+ignore_missing_imports = true
+follow_imports = "skip"

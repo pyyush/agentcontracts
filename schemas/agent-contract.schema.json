@@ -4,7 +4,11 @@
   "title": "Agent Contract",
   "description": "YAML specification for enforceable agent behavioral contracts. Supports three graduated tiers: Standalone (Tier 0), Enforceable (Tier 1), and Composable (Tier 2).",
   "type": "object",
-  "required": ["agent_contract", "identity", "contract"],
+  "required": [
+    "agent_contract",
+    "identity",
+    "contract"
+  ],
   "additionalProperties": true,
   "patternProperties": {
     "^x-": {
@@ -54,7 +58,10 @@
   "$defs": {
     "Identity": {
       "type": "object",
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "additionalProperties": true,
       "properties": {
         "name": {
@@ -73,27 +80,36 @@
         },
         "authors": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "List of agent authors or maintainers."
         }
       }
     },
     "Contract": {
       "type": "object",
-      "required": ["postconditions"],
+      "required": [
+        "postconditions"
+      ],
       "additionalProperties": true,
       "properties": {
         "postconditions": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/Postcondition" },
+          "items": {
+            "$ref": "#/$defs/Postcondition"
+          },
           "description": "At least one machine-checkable output guarantee. This is what makes it a contract, not a README."
         }
       }
     },
     "Postcondition": {
       "type": "object",
-      "required": ["name", "check"],
+      "required": [
+        "name",
+        "check"
+      ],
       "additionalProperties": true,
       "properties": {
         "name": {
@@ -108,13 +124,21 @@
         },
         "enforcement": {
           "type": "string",
-          "enum": ["sync_block", "sync_warn", "async_monitor"],
+          "enum": [
+            "sync_block",
+            "sync_warn",
+            "async_monitor"
+          ],
           "default": "sync_warn",
           "description": "When and how this check runs. sync_block: fails the invocation. sync_warn: logs warning. async_monitor: evaluates asynchronously."
         },
         "severity": {
           "type": "string",
-          "enum": ["critical", "major", "minor"],
+          "enum": [
+            "critical",
+            "major",
+            "minor"
+          ],
           "default": "major",
           "description": "Impact level when this postcondition fails."
         },
@@ -155,11 +179,20 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["name", "check"],
+            "required": [
+              "name",
+              "check"
+            ],
             "properties": {
-              "name": { "type": "string" },
-              "check": { "type": "string" },
-              "description": { "type": "string" }
+              "name": {
+                "type": "string"
+              },
+              "check": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
             }
           },
           "description": "Preconditions that must hold before the agent runs."
@@ -190,44 +223,62 @@
     },
     "EffectsAuthorized": {
       "type": "object",
-      "description": "Capability scope — what the agent MAY do. Default: deny all. Composes via intersection during delegation.",
+      "description": "Capability scope \u2014 what the agent MAY do. Default: deny all. Composes via intersection during delegation.",
       "additionalProperties": true,
       "properties": {
         "tools": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Allowlist of tool names or glob patterns (e.g., 'database.*'). Tools not listed are BLOCKED."
         },
         "network": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Allowed network egress URL patterns (e.g., 'https://api.example.com/*')."
         },
         "state_writes": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Allowed state write scope patterns (e.g., 'tickets.*', 'user.preferences')."
+        },
+        "filesystem": {
+          "$ref": "#/$defs/FilesystemAuthorization"
+        },
+        "shell": {
+          "$ref": "#/$defs/ShellAuthorization"
         }
       }
     },
     "EffectsDeclared": {
       "type": "object",
-      "description": "Effect footprint — what side effects actually occur. Composes via union for auditing. Runtime enforces declared ⊆ authorized.",
+      "description": "Effect footprint \u2014 what side effects actually occur. Composes via union for auditing. Runtime enforces declared \u2286 authorized.",
       "additionalProperties": true,
       "properties": {
         "tools": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Tools that this agent actually invokes."
         },
         "network": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Network endpoints this agent actually contacts."
         },
         "state_writes": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "State scopes this agent actually modifies."
         }
       }
@@ -260,6 +311,11 @@
               "type": "number",
               "exclusiveMinimum": 0,
               "description": "Maximum wall-clock time in seconds per invocation."
+            },
+            "max_shell_commands": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Maximum number of shell commands per invocation."
             }
           }
         }
@@ -274,7 +330,9 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["name"],
+            "required": [
+              "name"
+            ],
             "additionalProperties": true,
             "properties": {
               "name": {
@@ -346,7 +404,9 @@
         },
         "allowed_agents": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Allowlist of agent names that can be delegated to."
         }
       }
@@ -359,32 +419,64 @@
         "traces": {
           "type": "object",
           "properties": {
-            "enabled": { "type": "boolean", "default": true },
-            "sample_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "sample_rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
           }
         },
         "metrics": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["name", "type"],
+            "required": [
+              "name",
+              "type"
+            ],
             "properties": {
-              "name": { "type": "string" },
-              "type": { "type": "string", "enum": ["counter", "histogram", "gauge"] },
-              "description": { "type": "string" }
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "counter",
+                  "histogram",
+                  "gauge"
+                ]
+              },
+              "description": {
+                "type": "string"
+              }
             }
           }
         },
         "violation_events": {
           "type": "object",
           "properties": {
-            "emit": { "type": "boolean", "default": true },
+            "emit": {
+              "type": "boolean",
+              "default": true
+            },
             "destination": {
               "type": "string",
-              "enum": ["stdout", "otel", "callback"],
+              "enum": [
+                "stdout",
+                "otel",
+                "callback"
+              ],
               "default": "stdout"
             }
           }
+        },
+        "run_artifact_path": {
+          "type": "string",
+          "description": "Repo-local verdict artifact path template. Supports {run_id}."
         }
       }
     },
@@ -399,7 +491,9 @@
         },
         "breaking_changes": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "List of breaking changes from the previous version."
         },
         "substitution": {
@@ -407,7 +501,9 @@
           "properties": {
             "compatible_with": {
               "type": "array",
-              "items": { "type": "string" },
+              "items": {
+                "type": "string"
+              },
               "description": "Versions this agent can substitute for (Liskov-style)."
             }
           }
@@ -422,27 +518,74 @@
         "contract_satisfaction_rate": {
           "type": "object",
           "properties": {
-            "target": { "type": "number", "minimum": 0, "maximum": 1 },
-            "window": { "type": "string" }
+            "target": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "window": {
+              "type": "string"
+            }
           }
         },
         "latency": {
           "type": "object",
           "properties": {
-            "p50_ms": { "type": "number" },
-            "p99_ms": { "type": "number" }
+            "p50_ms": {
+              "type": "number"
+            },
+            "p99_ms": {
+              "type": "number"
+            }
           }
         },
         "cost": {
           "type": "object",
           "properties": {
-            "avg_usd": { "type": "number" },
-            "p99_usd": { "type": "number" }
+            "avg_usd": {
+              "type": "number"
+            },
+            "p99_usd": {
+              "type": "number"
+            }
           }
         },
         "error_budget_policy": {
           "type": "string",
           "description": "Action when error budget is exhausted (e.g., 'freeze_deployments', 'alert_only')."
+        }
+      }
+    },
+    "FilesystemAuthorization": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "read": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Repo-local read allowlist globs for coding/build agents."
+        },
+        "write": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Repo-local write allowlist globs for coding/build agents."
+        }
+      }
+    },
+    "ShellAuthorization": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed shell command patterns (glob-style matching on normalized command strings)."
         }
       }
     }

@@ -1,12 +1,11 @@
 """Framework adapters for Agent Contracts.
 
-Each adapter is a thin wrapper (<200 LOC) that maps framework-specific
-hooks to the SDK's enforcement API. Install the corresponding extra
-to use an adapter:
+The contract, CLI, verdict artifact, and GitHub Action are framework-
+agnostic by design — these adapters are optional ergonomic helpers that
+forward in-runtime hook calls into the same enforcer. The CI verdict
+gate is the source of truth.
 
-    pip install aicontracts[langchain]
-    pip install aicontracts[crewai]
-    pip install aicontracts[pydantic-ai]
-    pip install aicontracts[openai]
     pip install aicontracts[claude]       # Python 3.10+
+    pip install aicontracts[openai]
+    pip install aicontracts[langchain]
 """

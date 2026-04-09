@@ -14,14 +14,11 @@ def tmp_yaml(tmp_path: Path):
     """Factory fixture — write a dict as YAML and return the path."""
 
     def _write(data: Dict[str, Any], name: str = "contract.yaml") -> Path:
-        p = tmp_path / name
-        p.write_text(yaml.dump(data, sort_keys=False), encoding="utf-8")
-        return p
+        path = tmp_path / name
+        path.write_text(yaml.dump(data, sort_keys=False), encoding="utf-8")
+        return path
 
     return _write
-
-
-# ---- Canonical contract data for each tier ----
 
 
 @pytest.fixture
@@ -40,7 +37,7 @@ def tier0_data() -> Dict[str, Any]:
 
 @pytest.fixture
 def tier1_data(tier0_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Tier 1 contract with schemas, effects, and budgets."""
+    """Tier 1 contract with coding/build authorization surfaces."""
     return {
         **tier0_data,
         "inputs": {"schema": {"type": "object", "properties": {"query": {"type": "string"}}}},
@@ -50,6 +47,11 @@ def tier1_data(tier0_data: Dict[str, Any]) -> Dict[str, Any]:
                 "tools": ["search", "database.read"],
                 "network": ["https://api.example.com/*"],
                 "state_writes": [],
+                "filesystem": {
+                    "read": ["src/**", "tests/**", "README.md"],
+                    "write": ["src/**", "tests/**"],
+                },
+                "shell": {"commands": ["python -m pytest *", "python -m ruff check *"]},
             }
         },
         "resources": {
@@ -58,6 +60,7 @@ def tier1_data(tier0_data: Dict[str, Any]) -> Dict[str, Any]:
                 "max_tokens": 10000,
                 "max_tool_calls": 20,
                 "max_duration_seconds": 30.0,
+                "max_shell_commands": 5,
             }
         },
     }
@@ -65,7 +68,7 @@ def tier1_data(tier0_data: Dict[str, Any]) -> Dict[str, Any]:
 
 @pytest.fixture
 def tier2_data(tier1_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Tier 2 contract with all composable fields."""
+    """Tier 2 contract with composable fields and verdict artifact path."""
     return {
         **tier1_data,
         "effects": {
@@ -97,6 +100,7 @@ def tier2_data(tier1_data: Dict[str, Any]) -> Dict[str, Any]:
                 {"name": "latency_ms", "type": "histogram"},
             ],
             "violation_events": {"emit": True, "destination": "otel"},
+            "run_artifact_path": ".agent-contracts/runs/{run_id}/verdict.json",
         },
         "versioning": {
             "build_id": "sha256:abc123",

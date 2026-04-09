@@ -18,6 +18,11 @@ htmlcov/
 .coverage
 .coverage.*
 *.lcov
+.omx/
+.pilot/
 .dev-session/
 .staff-engineer-state.json
+AGENTS.md
+CLAUDE.md
+docs/plans/
 ROADMAP.md

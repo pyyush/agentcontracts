@@ -46,6 +46,21 @@ class PostconditionDef:
 
 
 @dataclass(frozen=True)
+class FilesystemAuthorization:
+    """Authorized repo-local filesystem scopes for coding/build agents."""
+
+    read: List[str] = field(default_factory=list)
+    write: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ShellAuthorization:
+    """Authorized shell command patterns for coding/build agents."""
+
+    commands: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class EffectsAuthorized:
     """Capability scope — what the agent MAY do (default: deny all).
 
@@ -55,6 +70,8 @@ class EffectsAuthorized:
     tools: List[str] = field(default_factory=list)
     network: List[str] = field(default_factory=list)
     state_writes: List[str] = field(default_factory=list)
+    filesystem: Optional[FilesystemAuthorization] = None
+    shell: Optional[ShellAuthorization] = None
 
 
 @dataclass(frozen=True)
@@ -65,6 +82,7 @@ class ResourceBudgets:
     max_tokens: Optional[int] = None
     max_tool_calls: Optional[int] = None
     max_duration_seconds: Optional[float] = None
+    max_shell_commands: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -161,6 +179,7 @@ class ObservabilityConfig:
     traces: Optional[TracesConfig] = None
     metrics: List[MetricDef] = field(default_factory=list)
     violation_events: Optional[ViolationEventsConfig] = None
+    run_artifact_path: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -242,6 +261,9 @@ class Contract:
     observability: Optional[ObservabilityConfig] = None
     versioning: Optional[VersioningConfig] = None
     slo: Optional[SLOConfig] = None
+
+    # Runtime metadata
+    source_path: Optional[str] = field(default=None, repr=False)
 
     # Raw data (preserves x- extensions and unknown fields)
     raw: Optional[Dict[str, Any]] = field(default=None, repr=False)

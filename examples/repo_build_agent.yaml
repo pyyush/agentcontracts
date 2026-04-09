@@ -1,11 +1,9 @@
-# Canonical coding/build repo contract
-
 agent_contract: "0.1.0"
 
 identity:
   name: repo-build-agent
   version: "0.1.0"
-  description: Fail-closed coding/build agent for this repository.
+  description: Repo-local coding/build agent with bounded file and shell scope.
 
 contract:
   postconditions:
@@ -13,38 +11,27 @@ contract:
       check: "output is not None"
       enforcement: sync_block
       severity: critical
-      description: The run must produce a result object.
 
     - name: repo_checks_green
       check: "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0"
       enforcement: sync_block
       severity: critical
-      description: Required repo checks must pass before the run is green.
 
 effects:
   authorized:
     filesystem:
-      read:
-        - "src/**"
-        - "tests/**"
-        - "README.md"
-        - "pyproject.toml"
-      write:
-        - "src/**"
-        - "tests/**"
-        - "README.md"
+      read: ["src/**", "tests/**", "README.md", "pyproject.toml"]
+      write: ["src/**", "tests/**", "README.md"]
     shell:
       commands:
         - "python -m pytest *"
         - "python -m ruff check *"
-        - "python -m mypy *"
     tools: []
     network: []
     state_writes: []
 
 resources:
   budgets:
-    max_cost_usd: 1.00
     max_tokens: 50000
     max_tool_calls: 20
     max_shell_commands: 10

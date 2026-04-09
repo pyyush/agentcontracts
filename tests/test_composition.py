@@ -20,7 +20,7 @@ class TestCheckCompatibility:
                 "authorized": {"tools": ["search"], "network": [], "state_writes": []},
                 "declared": {"tools": ["search"], "network": [], "state_writes": []},
             },
-            "resources": {"budgets": {"max_cost_usd": 0.25, "max_tokens": 5000, "max_tool_calls": 10, "max_duration_seconds": 15.0}},
+            "resources": {"budgets": {"max_cost_usd": 0.25, "max_tokens": 5000, "max_tool_calls": 10, "max_duration_seconds": 15.0, "max_shell_commands": 3}},
             "delegation": {
                 "max_depth": 1,
                 "allowed_agents": [],
