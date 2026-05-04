@@ -9,11 +9,28 @@ Works with Claude Code, Codex, Cursor, and any agent runtime — the core is fra
 
 > **Release status:** This branch is preparing `aicontracts 1.0.0` and contract spec `1.0.0`. PyPI currently publishes `aicontracts 0.2.0`; do not treat `1.0.0` as available until the PyPI package and `v1.0.0` GitHub tag are both published.
 
+Published install:
+
 ```bash
 pip install aicontracts
 aicontracts init --template coding -o AGENT_CONTRACT.yaml
 aicontracts validate AGENT_CONTRACT.yaml
 ```
+
+Release-branch install to first working example, under five minutes:
+
+```bash
+git clone https://github.com/pyyush/agentcontracts.git
+cd agentcontracts
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
+python examples/run_green_pass.py
+python -m agent_contracts.cli check-verdict examples/.demo-artifacts/green-pass.json
+```
+
+Expected result: the demo prints `outcome: pass`, writes a schema-valid verdict artifact, and `check-verdict` exits zero. The blocked and failed demos in `examples/` show the two red-path gates.
 
 > **The CI verdict gate is the source of truth.** Every run emits one durable `verdict.json`. The merge cannot go green if the verdict is `blocked` or `fail`. In-runtime adapters add convenience — the gate is what makes enforcement complete.
 
@@ -28,6 +45,14 @@ Coding agents are in production. Claude Code, Codex, Cursor Agent, Devin, Aider 
 - unauthorized network calls and tool use buried in the trace
 
 A repo shouldn't trust an agent any more than it trusts a random PR. `agent-contracts` is the smallest thing that gives a repo a declarative *"here is exactly what this agent may do"* — and a CI gate that refuses to merge runs that violated it.
+
+## Top 3 adoption questions
+
+**Why use this instead of prompt instructions?** Prompt instructions are advisory. `AGENT_CONTRACT.yaml` is parsed, enforced by the runtime where hooks exist, and checked again in CI from a durable verdict artifact.
+
+**What if my agent host cannot expose every native file or shell action?** Use the adapter for the coverage the host exposes, then make `aicontracts check-verdict` a required CI gate. The final verdict can still reject red repo checks and malformed or blocked artifacts even when the local host is only partially observable.
+
+**How much work is first adoption?** Start with `aicontracts init --template coding`, narrow file and shell scopes, run one example from `examples/`, and add the GitHub Action or `check-verdict` command to CI. The release-branch quick start above proves the loop without any hosted service.
 
 ## What an agent cannot do under a contract
 
@@ -191,6 +216,17 @@ aicontracts check-compat producer.yaml consumer.yaml
 aicontracts check-verdict .agent-contracts/runs/<run-id>/verdict.json
 ```
 
+## API reference
+
+The stable public Python imports for the `1.0.0` release train are documented in the generated API reference at `docs/api-reference.md`. Regenerate it with:
+
+```bash
+python scripts/generate_api_reference.py
+python scripts/generate_api_reference.py --check
+```
+
+Hosted path after merge: https://github.com/pyyush/agentcontracts/blob/main/docs/api-reference.md.
+
 ## Version policy
 
 `aicontracts` package versions and `agent_contract` spec versions are related but distinct SemVer streams. For the planned stable release, package `1.0.0` implements contract spec `1.0.0` and the stable verdict artifact schema. After that, package patch and minor releases may continue to implement contract spec `1.0.0`; the spec version changes only when the YAML contract or verdict artifact semantics change.
@@ -206,6 +242,8 @@ SemVer stability covers:
 - **GitHub Action:** input names, output names, outcome behavior, and the package pin installed by each release tag.
 
 Major releases may make incompatible changes to those surfaces. Minor releases add backward-compatible capabilities. Patch releases fix bugs, security issues, and documentation without changing stable semantics.
+
+Migration notes from `0.2.0` to `1.0.0` live in `docs/migration-0.2-to-1.0.md`.
 
 ## Performance guardrails
 
@@ -277,6 +315,12 @@ Use immutable release tags for production workflows. The planned `v1.0.0` action
 
 The action validates contracts and, when a verdict path is provided, schema-validates the artifact before failing the workflow for `blocked` or `fail` outcomes.
 
+For PR review, prefer showing the verdict outcome, failed clauses, and required check statuses in the workflow summary. `docs/adoption-guide.md` includes a copy-paste summary snippet and host-specific notes for Claude Code, Codex, Claude Agent SDK, OpenAI Agents SDK, and LangChain.
+
+## Debugging downstream failures
+
+When a downstream user reports a failed or blocked run, ask for the exact `verdict.json`. The useful fields are `outcome`, `final_gate`, `violations[].violated_clause`, `violations[].evidence`, `checks[]`, `warnings[]`, and `budgets`. Re-run `python -m agent_contracts.cli check-verdict path/to/verdict.json --json-output` locally before changing code; a `blocked` verdict usually means the contract or agent behavior needs narrowing, while a `fail` verdict means a required repo check or postcondition is red.
+
 ## Canonical examples
 
 - `AGENT_CONTRACT.yaml` — canonical repo-build agent contract
@@ -284,7 +328,14 @@ The action validates contracts and, when a verdict path is provided, schema-vali
 - `examples/demo_blocked_file_write.yaml` — protected-file demo
 - `examples/demo_blocked_command.yaml` — forbidden-command demo
 - `examples/demo_failed_checks.yaml` — red-checks demo
+- `examples/run_green_pass.py` — runnable green verdict demo
+- `examples/run_blocked_file_write.py` — runnable blocked file-write verdict demo
+- `examples/run_blocked_command.py` — runnable blocked shell verdict demo
+- `examples/run_failed_checks.py` — runnable failed-check verdict demo
+- `examples/verdicts/*.json` — schema-valid sample verdict artifacts for docs and PR summaries
 - `examples/support_triage.yaml` — broader tier-2 example retained for composition docs
+
+Troubleshooting for the top adoption questions lives in `docs/troubleshooting.md`.
 
 ## Project structure
 

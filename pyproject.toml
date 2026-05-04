@@ -57,7 +57,7 @@ aicontracts = "agent_contracts.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/pyyush/agentcontracts"
-Documentation = "https://github.com/pyyush/agentcontracts/tree/main/spec"
+Documentation = "https://github.com/pyyush/agentcontracts/tree/main/docs"
 Issues = "https://github.com/pyyush/agentcontracts/issues"
 
 [tool.hatch.version]
@@ -70,8 +70,18 @@ packages = ["src/agent_contracts"]
 include = [
     "src/",
     "schemas/",
+    "spec/",
+    "examples/",
+    "docs/api-reference.md",
+    "docs/adoption-guide.md",
+    "docs/migration-0.2-to-1.0.md",
+    "docs/troubleshooting.md",
+    "scripts/generate_api_reference.py",
     "LICENSE",
     "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
 ]
 
 [tool.pytest.ini_options]

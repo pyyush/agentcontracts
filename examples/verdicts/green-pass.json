@@ -1,0 +1,50 @@
+{
+  "run_id": "example-green-pass",
+  "contract": {
+    "name": "repo-build-agent",
+    "version": "1.0.0",
+    "spec_version": "1.0.0"
+  },
+  "host": {
+    "name": "examples/run_green_pass.py",
+    "version": "demo"
+  },
+  "outcome": "pass",
+  "final_gate": "allowed",
+  "violations": [],
+  "checks": [
+    {
+      "name": "pytest",
+      "status": "pass",
+      "required": true,
+      "exit_code": 0,
+      "detail": "demo records the required repo check as passing",
+      "evidence": {
+        "command": "python -m pytest tests/test_cli.py"
+      }
+    },
+    {
+      "name": "ruff",
+      "status": "pass",
+      "required": true,
+      "exit_code": 0,
+      "detail": "demo records lint as passing",
+      "evidence": {
+        "command": "python -m ruff check src/ tests/"
+      }
+    }
+  ],
+  "budgets": {
+    "cost_usd": 0.0,
+    "tokens": 0,
+    "tool_calls": 0,
+    "shell_commands": 1,
+    "duration_seconds": 0.01
+  },
+  "artifacts": {
+    "verdict_path": ".agent-contracts/runs/example-green-pass/verdict.json",
+    "contract_path": "examples/repo_build_agent.yaml"
+  },
+  "timestamp": "2026-05-04T00:00:00+00:00",
+  "warnings": []
+}

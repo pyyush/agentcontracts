@@ -535,6 +535,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** Value, Docs, Observability, Release & distribution
 
+**Status:** Complete (2026-05-04)
+
 **Estimate:** 3 cycles
 
 **Dependencies:** Tasks 2-8 should land first so docs match behavior.
@@ -549,16 +551,39 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] Add end-to-end demos for blocked file write, blocked shell command, failed checks, and green pass artifact.
-- [ ] Add host-specific integration docs for Claude Code, Codex, Claude Agent SDK, OpenAI Agents SDK, and LangChain.
-- [ ] Add sample verdict artifacts and CI annotations/PR-review guidance.
-- [ ] Update changelog with migration notes from `0.2.0` to `1.0.0`.
+- [x] Add end-to-end demos for blocked file write, blocked shell command, failed checks, and green pass artifact.
+- [x] Add host-specific integration docs for Claude Code, Codex, Claude Agent SDK, OpenAI Agents SDK, and LangChain.
+- [x] Add sample verdict artifacts and CI annotations/PR-review guidance.
+- [x] Update changelog with migration notes from `0.2.0` to `1.0.0`.
+- [x] Add release-branch install-to-first-working-example path in README.
+- [x] Add top 3 README adoption questions and downstream debugging guidance.
+- [x] Add generated API reference and generator/check command.
+- [x] Add troubleshooting page covering the top five audit/demo adoption questions.
 
 **Acceptance:**
 
 - A skeptical repo owner can adopt the package from README plus examples.
 - Docs make host limitations clear and do not overclaim hard-stop coverage.
 - Demo artifacts validate against the verdict schema.
+
+**Verification:** Completed for Phase 3 Task 11.
+
+- `python3 -m pip install -e ".[dev]"`: passed.
+- `python3 examples/run_green_pass.py --artifact-dir /tmp/aicontracts-task11-demo`: passed, emitted `pass` / `allowed`.
+- `python3 examples/run_blocked_file_write.py --artifact-dir /tmp/aicontracts-task11-demo`: passed, emitted expected `blocked` / `blocked`.
+- `python3 examples/run_blocked_command.py --artifact-dir /tmp/aicontracts-task11-demo`: passed, emitted expected `blocked` / `blocked`.
+- `python3 examples/run_failed_checks.py --artifact-dir /tmp/aicontracts-task11-demo`: passed, emitted expected `fail` / `failed`.
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 240 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- CLI smoke checks for `AGENT_CONTRACT.yaml`, `examples/support_triage.yaml`, and `check-compat examples/support_triage.yaml examples/support_triage.yaml`: passed.
+- `python3 -m pip index versions aicontracts`: PyPI latest verified as `0.2.0`; local editable install is `1.0.0`.
+- `python3 -m pip_audit . --progress-spinner off`: passed, no known vulnerabilities found.
+- `python3 scripts/generate_api_reference.py --check`: passed.
+- All YAML files under `examples/*.yaml` loaded successfully.
+- `python3 -m build && python3 -m twine check dist/*`: passed.
+- Distribution hygiene dry run confirmed the sdist contains public docs/examples and neither wheel nor sdist contains internal-only files.
+- `git diff --check`: passed before final commit.
 
 **Risks/blockers:**
 

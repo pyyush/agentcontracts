@@ -18,6 +18,7 @@ htmlcov/
 .coverage
 .coverage.*
 *.lcov
+examples/.demo-artifacts/
 .omx/
 .pilot/
 .dev-session/

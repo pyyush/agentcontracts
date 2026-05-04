@@ -16,17 +16,30 @@ All notable changes to this project are tracked here.
 - added a JSON Schema for verdict artifacts and made `check-verdict` validate artifacts before outcome gating
 - added explicit adapter verdict finalizers for Claude Agent SDK, OpenAI Agents SDK, and LangChain integrations
 - added adapter lifecycle tests covering schema-valid pass, blocked, failed-output, and unexpected-error verdict paths
+- added runnable release demos for green pass, blocked file write, blocked shell command, and failed repo checks
+- added schema-valid sample verdict artifacts under `examples/verdicts/`
+- added generated API reference docs plus `scripts/generate_api_reference.py`
+- added adoption, migration, and troubleshooting docs for the `0.2.0` to `1.0.0` path
 
 ### Changed
 
 - changed canonical contracts and examples to declare `agent_contract: "1.0.0"` for the stable spec
 - changed OpenAI Agents SDK and LangChain completion callbacks to finalize verdict artifacts instead of only evaluating postconditions in memory
+- changed source distributions to include public docs, examples, spec files, and release notes needed for offline adoption
 
 ### Security
 
 - updated the optional LangChain adapter extra from `langchain-core==1.2.26` to `langchain-core==1.2.28`, which includes the fix for `CVE-2026-40087`
 - changed configured effect authorization to fail closed for omitted `filesystem` and `shell` sub-surfaces; once `effects.authorized` is present, omitted file or shell authorization denies those effects by default
 - changed `eval:` postconditions to stop auto-passing without evaluator integration; blocking eval checks fail closed, while warning and async eval checks emit visible warnings
+
+### Migration from 0.2.0
+
+- set stable contracts to `agent_contract: "1.0.0"`
+- explicitly list intended `filesystem` and `shell` authorizations whenever `effects.authorized` is present
+- review path globs for canonical repo-relative matching; traversal-shaped inputs no longer match allowlisted prefixes
+- replace placeholder blocking `eval:` checks with deterministic checks or a concrete evaluator integration
+- gate schema-backed verdict artifacts with `aicontracts check-verdict`
 
 ## [0.2.0] - 2026-04-06
 

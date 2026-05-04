@@ -1,0 +1,43 @@
+{
+  "run_id": "example-blocked-file-write",
+  "contract": {
+    "name": "blocked-file-write-demo",
+    "version": "1.0.0",
+    "spec_version": "1.0.0"
+  },
+  "host": {
+    "name": "examples/run_blocked_file_write.py",
+    "version": "demo"
+  },
+  "outcome": "blocked",
+  "final_gate": "blocked",
+  "violations": [
+    {
+      "contract_id": "blocked-file-write-demo",
+      "contract_version": "1.0.0",
+      "violated_clause": "effects.authorized.filesystem.write",
+      "evidence": {
+        "path": "tests/secret.env",
+        "authorized": ["src/**"]
+      },
+      "severity": "critical",
+      "enforcement": "blocked",
+      "timestamp": "2026-05-04T00:00:00+00:00",
+      "event_id": "example-blocked-file-write-event"
+    }
+  ],
+  "checks": [],
+  "budgets": {
+    "cost_usd": 0.0,
+    "tokens": 0,
+    "tool_calls": 0,
+    "shell_commands": 0,
+    "duration_seconds": 0.01
+  },
+  "artifacts": {
+    "verdict_path": ".agent-contracts/runs/example-blocked-file-write/verdict.json",
+    "contract_path": "examples/demo_blocked_file_write.yaml"
+  },
+  "timestamp": "2026-05-04T00:00:00+00:00",
+  "warnings": []
+}
