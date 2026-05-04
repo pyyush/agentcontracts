@@ -95,6 +95,15 @@ One cycle means one focused implementation pass with tests and local verificatio
 - Paths outside the repo root are denied when filesystem authorization is configured.
 - Existing canonical examples still validate and pass smoke tests.
 
+**Verification:** Completed for Phase 3 Task 2.
+
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 193 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- CLI smoke checks for `AGENT_CONTRACT.yaml`, `examples/support_triage.yaml`, and `check-compat examples/support_triage.yaml examples/support_triage.yaml`: passed.
+- Core `pip-audit`: no known vulnerabilities found.
+- Optional extras `pip-audit` with `langchain-core==1.2.28`, `openai-agents==0.13.5`, and `claude-agent-sdk==0.1.56`: no known vulnerabilities found.
+
 **Risks/blockers:**
 
 - Existing users may rely on raw-pattern matching for unusual paths. Document this as a security hardening change for `1.0.0`.
