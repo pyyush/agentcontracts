@@ -147,10 +147,11 @@ python -m agent_contracts.cli check-verdict "<PATH_TO_VERDICT_JSON>"
 ## GitHub Action Gate Smoke
 
 At least one validator must add the action to a branch and link the run.
-Before this can satisfy the RC gate, the RC action ref must install the same RC
-package artifact being validated. The current final-release action installs
-`aicontracts==1.0.0`; an RC tag must not point at that final pin unless the
-final package already exists.
+Before this can satisfy the RC gate, the action run must install the same RC
+package artifact being validated. The action defaults to the final
+`aicontracts==1.0.0` package for stable release tags, so RC validators must
+override `package-spec` to the RC wheel URL, local wheel path, or pre-release
+requirement.
 
 ```yaml
 name: Agent Contract
@@ -168,6 +169,11 @@ jobs:
         with:
           contract: AGENT_CONTRACT.yaml
           verdict: .agent-contracts/runs/latest/verdict.json
+          package-spec: "<RC_WHEEL_URL_OR_aicontracts==1.0.0rc1>"
+          allow-prerelease: "true"
+          # Optional for TestPyPI or a private package index:
+          # pip-index-url: "<RC_INDEX_URL>"
+          # pip-extra-index-url: "https://pypi.org/simple"
 ```
 
 If the validator cannot produce a real agent verdict yet, they must still run
@@ -234,8 +240,7 @@ The RC must not advance to final release if any of these are true:
 - No `1.0.0` RC package, git tag, or GitHub release has been cut.
 - No external developer validation has been recorded.
 - No GitHub Action RC run has been linked from an external repo.
-- No RC action ref has been prepared that installs the matching RC package
-  instead of the final `aicontracts==1.0.0` pin.
+- No GitHub Action RC run has installed and validated a real RC artifact yet.
 - Registry credentials and trusted publishing/provenance still need release-owner
   verification.
 - Branch protection and required CI status must be confirmed in GitHub settings.

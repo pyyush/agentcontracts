@@ -313,6 +313,22 @@ The trade-off: legitimate piped commands like `cat file | head` cannot be expres
 
 Use immutable release tags for production workflows. The planned `v1.0.0` action tag installs `aicontracts==1.0.0`, so the GitHub tag must not be cut until the PyPI package is published. Before that release exists, keep production workflows pinned to the latest published 0.x action tag.
 
+For release-candidate validation only, keep the action ref pinned to the RC tag
+and override `package-spec` so the action installs the exact RC package being
+validated:
+
+```yaml
+- uses: pyyush/agentcontracts@<RC_TAG>
+  with:
+    contract: AGENT_CONTRACT.yaml
+    verdict: .agent-contracts/runs/${{ github.run_id }}/verdict.json
+    package-spec: "<RC_WHEEL_URL_OR_aicontracts==1.0.0rc1>"
+    allow-prerelease: "true"
+```
+
+Production workflows should not override `package-spec` after `v1.0.0` exists;
+the default remains the stable final `aicontracts==1.0.0` pin.
+
 The action validates contracts and, when a verdict path is provided, schema-validates the artifact before failing the workflow for `blocked` or `fail` outcomes.
 
 For PR review, prefer showing the verdict outcome, failed clauses, and required check statuses in the workflow summary. `docs/adoption-guide.md` includes a copy-paste summary snippet and host-specific notes for Claude Code, Codex, Claude Agent SDK, OpenAI Agents SDK, and LangChain.

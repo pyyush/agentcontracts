@@ -20,12 +20,15 @@ All notable changes to this project are tracked here.
 - added schema-valid sample verdict artifacts under `examples/verdicts/`
 - added generated API reference docs plus `scripts/generate_api_reference.py`
 - added adoption, migration, and troubleshooting docs for the `0.2.0` to `1.0.0` path
+- added GitHub Action RC install inputs so validators can install the exact release-candidate package artifact without changing the final stable default
+- added release workflow prerelease detection so PEP 440 RC tags create GitHub prereleases
 
 ### Changed
 
 - changed canonical contracts and examples to declare `agent_contract: "1.0.0"` for the stable spec
 - changed OpenAI Agents SDK and LangChain completion callbacks to finalize verdict artifacts instead of only evaluating postconditions in memory
 - changed source distributions to include public docs, examples, spec files, and release notes needed for offline adoption
+- changed package metadata to classify the `1.0.0` release train as production/stable
 
 ### Security
 

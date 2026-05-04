@@ -24,6 +24,22 @@ inputs:
     description: 'Python version to use'
     required: false
     default: '3.11'
+  package-spec:
+    description: 'Package requirement, wheel URL, or local wheel path to install'
+    required: false
+    default: 'aicontracts==1.0.0'
+  allow-prerelease:
+    description: 'Pass --pre to pip when installing package-spec'
+    required: false
+    default: 'false'
+  pip-index-url:
+    description: 'Optional pip --index-url for package installation'
+    required: false
+    default: ''
+  pip-extra-index-url:
+    description: 'Optional pip --extra-index-url for package installation'
+    required: false
+    default: ''
 
 outputs:
   outcome:
@@ -45,9 +61,38 @@ runs:
 
     - name: Install aicontracts
       shell: bash
-      # Keep this PyPI pin aligned with the action release tag. Do not tag
-      # v1.0.0 until aicontracts==1.0.0 has been published.
-      run: python -m pip install aicontracts==1.0.0
+      env:
+        AICONTRACTS_PACKAGE_SPEC: ${{ inputs.package-spec }}
+        AICONTRACTS_ALLOW_PRERELEASE: ${{ inputs.allow-prerelease }}
+        AICONTRACTS_PIP_INDEX_URL: ${{ inputs.pip-index-url }}
+        AICONTRACTS_PIP_EXTRA_INDEX_URL: ${{ inputs.pip-extra-index-url }}
+      # Keep the default PyPI pin aligned with the final action release tag.
+      # RC validators must override package-spec so the action installs the
+      # exact RC artifact being validated.
+      run: |
+        set -euo pipefail
+
+        if [ -z "$AICONTRACTS_PACKAGE_SPEC" ]; then
+          echo "::error::package-spec must not be empty"
+          exit 2
+        fi
+
+        pip_args=(install)
+        if [ "$AICONTRACTS_ALLOW_PRERELEASE" = "true" ]; then
+          pip_args+=(--pre)
+        elif [ "$AICONTRACTS_ALLOW_PRERELEASE" != "false" ]; then
+          echo "::error::allow-prerelease must be 'true' or 'false'"
+          exit 2
+        fi
+        if [ -n "$AICONTRACTS_PIP_INDEX_URL" ]; then
+          pip_args+=(--index-url "$AICONTRACTS_PIP_INDEX_URL")
+        fi
+        if [ -n "$AICONTRACTS_PIP_EXTRA_INDEX_URL" ]; then
+          pip_args+=(--extra-index-url "$AICONTRACTS_PIP_EXTRA_INDEX_URL")
+        fi
+        pip_args+=("$AICONTRACTS_PACKAGE_SPEC")
+
+        python -m pip "${pip_args[@]}"
 
     - name: Validate contract and verdict
       id: gate

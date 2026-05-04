@@ -393,7 +393,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 **Results:**
 
 - Retained the existing `tests/test_cli.py` additions for verdict schema failures and `--fail-on-warn`; they passed unchanged and already cover the CLI half of this task.
-- Added a lightweight local smoke test in `tests/test_action_yml.py` that parses `action.yml` and asserts the critical shell semantics are present: pinned `aicontracts==1.0.0` install, `fail-on-warning` handling, `fail-on-warn-outcome` mapping to `--fail-on-warn`, `check-verdict` invocation, and fail-closed exit behavior.
+- Added a lightweight local smoke test in `tests/test_action_yml.py` that parses `action.yml` and asserts the critical shell semantics are present: default `aicontracts==1.0.0` install, RC-safe package override inputs, `fail-on-warning` handling, `fail-on-warn-outcome` mapping to `--fail-on-warn`, `check-verdict` invocation, and fail-closed exit behavior.
 - Verified the release-pin guidance against live PyPI state: `aicontracts 0.2.0` is still the latest published version, so the existing README and action comments about not cutting `v1.0.0` before publishing `aicontracts==1.0.0` remain accurate. No README wording change was required.
 - Reviewed multi-contract action output behavior and left it unchanged for `1.0.0`; the current grouped validation logs plus final outputs are acceptable for this release slice.
 
@@ -626,7 +626,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 - External validation requires calendar coordination and cannot be completed by implementation alone.
 - No RC artifact, package URL, tag, checksums, external validator, or GitHub Action validation URL exists yet.
-- The RC action ref must install the matching RC package artifact; the final-release action currently pins `aicontracts==1.0.0`.
+- The action now supports RC package installation through `package-spec`; a real RC validation run must set that input to the matching RC artifact instead of relying on the final default `aicontracts==1.0.0` pin.
 - Task 12 must stay open until a real external developer runs the RC in their own project and the feedback is incorporated or explicitly deferred.
 
 **Task 12 preparation verification:** Completed for the RC validation handoff.
@@ -661,6 +661,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 **Plan:**
 
 - [ ] Cut `1.0.0rc1` or equivalent pre-release artifact if PyPI flow supports it.
+- [x] Prepare the GitHub Action install path so RC validators can install the matching RC artifact without weakening the stable `v1.0.0` default.
+- [x] Update package metadata for the stable release train.
 - [ ] Run full local gates and GitHub matrix.
 - [ ] Run dependency audit gates.
 - [ ] Run action smoke gate.
@@ -675,7 +677,16 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Risks/blockers:**
 
-- RC gate must remain blocked until implementation and external validation are done.
+- RC gate must remain blocked until a real RC artifact, registry/provenance path, GitHub CI matrix, and external validation evidence exist.
+
+**Task 13 preparation verification:** Completed for local pre-RC self-blockers.
+
+- `action.yml` defaults to `package-spec: aicontracts==1.0.0` for final release tags and supports RC validation through `package-spec`, `allow-prerelease`, `pip-index-url`, and `pip-extra-index-url`.
+- `tests/test_action_yml.py` verifies the stable default pin, RC install override inputs, guarded prerelease flag handling, package-spec non-empty check, and fail-closed verdict gate semantics.
+- `.github/workflows/publish.yml` marks PEP 440 prerelease tags (`a`, `b`, `rc`, `.dev`) as GitHub prereleases, keeping RC GitHub releases distinct from final stable releases.
+- `tests/test_release_workflow.py` verifies the release workflow prerelease detection and `softprops/action-gh-release` wiring.
+- `pyproject.toml` now uses `Development Status :: 5 - Production/Stable` for the planned stable package metadata.
+- `RC_VALIDATION.md` documents the required RC action override and no longer lists the lack of an RC-capable action ref as a local blocker.
 
 ## Dependency Graph
 
