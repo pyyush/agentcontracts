@@ -36,5 +36,5 @@ jobs:
           python -m agent_contracts.cli check-compat examples/support_triage.yaml examples/support_triage.yaml
       - name: Install audit tool
         run: python -m pip install pip-audit
-      - name: Audit installed dependencies
-        run: python -m pip_audit --local --progress-spinner off
+      - name: Audit project dependencies
+        run: python -m pip_audit . --progress-spinner off

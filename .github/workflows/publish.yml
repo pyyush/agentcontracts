@@ -37,8 +37,8 @@ jobs:
           python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
           python -m agent_contracts.cli validate examples/support_triage.yaml
           python -m agent_contracts.cli check-compat examples/support_triage.yaml examples/support_triage.yaml
-      - name: Audit installed dependencies
-        run: python -m pip_audit --local --progress-spinner off
+      - name: Audit project dependencies
+        run: python -m pip_audit . --progress-spinner off
       - name: Build package
         run: python -m build
       - name: Check distribution hygiene

@@ -454,8 +454,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 - Added `SECURITY.md` with a private-reporting-first disclosure path and public issue fallback only for non-sensitive hardening requests.
 - Added `CONTRIBUTING.md` with setup, canonical local gates, adapter-extra guidance, release hygiene, and security hygiene notes.
 - Added `CODEOWNERS`, Dependabot config for Python and GitHub Actions, bug/security-hardening issue templates, and a PR template with required verification.
-- CI now runs `check-compat` alongside canonical validation and audits the clean CI environment with `pip-audit`.
-- Release verification installs adapter extras, `build`, `twine`, and `pip-audit` explicitly, audits the release environment, and checks built wheel/sdist contents for internal-only files with a Python standard-library script instead of relying on unavailable shell tools.
+- CI now runs `check-compat` alongside canonical validation and audits the project dependency graph with `pip-audit .` so runner tooling like `pip`, `pytest`, and `twine` does not create false release blockers.
+- Release verification installs adapter extras, `build`, `twine`, and `pip-audit` explicitly, audits the project dependency graph, and checks built wheel/sdist contents for internal-only files with a Python standard-library script instead of relying on unavailable shell tools.
 
 **Verification:**
 
