@@ -423,6 +423,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** Security, Repo hygiene, Release & distribution, Docs
 
+**Status:** Complete in Phase 3 Task 9.
+
 **Estimate:** 2 cycles
 
 **Dependencies:** Task 1 should land first.
@@ -440,12 +442,31 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] Add security reporting policy.
-- [ ] Add contributor setup and canonical commands.
-- [ ] Add ownership/review routing.
-- [ ] Add Dependabot or equivalent dependency update automation.
-- [ ] Add `pip-audit` gates for core and optional extras.
-- [ ] Make release hygiene checks explicit and remove implicit reliance on tools not installed by the workflow.
+- [x] Add security reporting policy.
+- [x] Add contributor setup and canonical commands.
+- [x] Add ownership/review routing.
+- [x] Add Dependabot or equivalent dependency update automation.
+- [x] Add `pip-audit` gates for core and optional extras.
+- [x] Make release hygiene checks explicit and remove implicit reliance on tools not installed by the workflow.
+
+**Results:**
+
+- Added `SECURITY.md` with a private-reporting-first disclosure path and public issue fallback only for non-sensitive hardening requests.
+- Added `CONTRIBUTING.md` with setup, canonical local gates, adapter-extra guidance, release hygiene, and security hygiene notes.
+- Added `CODEOWNERS`, Dependabot config for Python and GitHub Actions, bug/security-hardening issue templates, and a PR template with required verification.
+- CI now runs `check-compat` alongside canonical validation and audits the clean CI environment with `pip-audit`.
+- Release verification installs adapter extras, `build`, `twine`, and `pip-audit` explicitly, audits the release environment, and checks built wheel/sdist contents for internal-only files with a Python standard-library script instead of relying on unavailable shell tools.
+
+**Verification:**
+
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 234 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- `python3 -m agent_contracts.cli validate AGENT_CONTRACT.yaml`: passed.
+- `python3 -m agent_contracts.cli validate examples/support_triage.yaml`: passed.
+- `python3 -m agent_contracts.cli check-compat examples/support_triage.yaml examples/support_triage.yaml`: passed.
+- `python3 -m pip_audit . --progress-spinner off`: passed, no known vulnerabilities found.
+- `git diff --check`: passed.
 
 **Acceptance:**
 

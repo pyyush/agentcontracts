@@ -16,12 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check repository hygiene
-        run: |
-          if git ls-files | rg -n '(^|/)(AGENTS\.md|CLAUDE\.md|docs/plans/|\.omx/|\.pilot/|\.dev-session/|\.staff-engineer-state\.json|\.staff-engineer\.json|ROADMAP\.md)$'; then
-            echo "Tracked internal-only files found in public release tree."
-            exit 1
-          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -31,7 +25,7 @@ jobs:
           PKG_VERSION="$(python -c "from pathlib import Path; ns = {}; exec(Path('src/agent_contracts/_version.py').read_text(encoding='utf-8'), ns); print(ns['__version__'])")"
           test "$TAG_VERSION" = "$PKG_VERSION"
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]" build twine
+        run: python -m pip install -e ".[dev,claude,openai,langchain]" build twine pip-audit
       - name: Lint
         run: python -m ruff check src/ tests/
       - name: Type check
@@ -43,8 +37,41 @@ jobs:
           python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
           python -m agent_contracts.cli validate examples/support_triage.yaml
           python -m agent_contracts.cli check-compat examples/support_triage.yaml examples/support_triage.yaml
+      - name: Audit installed dependencies
+        run: python -m pip_audit --local --progress-spinner off
       - name: Build package
         run: python -m build
+      - name: Check distribution hygiene
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+          import tarfile
+          import zipfile
+
+          forbidden = re.compile(
+              r"(^|/)(AGENTS\.md|CLAUDE\.md|docs/plans/|\.omx/|\.pilot/|"
+              r"\.dev-session/|\.staff-engineer-state\.json|\.staff-engineer\.json|ROADMAP\.md)$"
+          )
+          offenders = []
+          for artifact in Path("dist").iterdir():
+              names: list[str]
+              if artifact.suffix == ".whl":
+                  with zipfile.ZipFile(artifact) as zf:
+                      names = zf.namelist()
+              elif artifact.name.endswith(".tar.gz"):
+                  with tarfile.open(artifact) as tf:
+                      names = tf.getnames()
+              else:
+                  continue
+              offenders.extend(f"{artifact.name}:{name}" for name in names if forbidden.search(name))
+
+          if offenders:
+              print("Internal-only files found in release artifacts:")
+              print("\n".join(offenders))
+              sys.exit(1)
+          PY
       - name: Check distributions
         run: python -m twine check dist/*
 
