@@ -593,6 +593,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** Value, Stability, Docs, Release & distribution
 
+**Status:** Handoff prepared (2026-05-04); external validation not complete.
+
 **Estimate:** 3 cycles plus calendar time
 
 **Dependencies:** Tasks 1-11 complete.
@@ -606,6 +608,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
+- [x] Prepare `RC_VALIDATION.md` with RC artifact placeholders, clean-project install steps, demo smoke commands, feedback fields, pass/fail criteria, known blockers, and exact evidence required for the release DoD.
 - [ ] Select at least two external or external-like repos: one Python repo and one JS/TS repo.
 - [ ] Install from the release candidate build.
 - [ ] Generate or adapt `AGENT_CONTRACT.yaml`.
@@ -622,6 +625,22 @@ One cycle means one focused implementation pass with tests and local verificatio
 **Risks/blockers:**
 
 - External validation requires calendar coordination and cannot be completed by implementation alone.
+- No RC artifact, package URL, tag, checksums, external validator, or GitHub Action validation URL exists yet.
+- The RC action ref must install the matching RC package artifact; the final-release action currently pins `aicontracts==1.0.0`.
+- Task 12 must stay open until a real external developer runs the RC in their own project and the feedback is incorporated or explicitly deferred.
+
+**Task 12 preparation verification:** Completed for the RC validation handoff.
+
+- `python3 -m pip install -e ".[dev]"`: passed.
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 240 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- CLI smoke checks for `AGENT_CONTRACT.yaml`, `examples/support_triage.yaml`, and `check-compat examples/support_triage.yaml examples/support_triage.yaml`: passed.
+- `python3 -m pip index versions aicontracts`: PyPI latest verified as `0.2.0`; local editable install is `1.0.0`.
+- `python3 -m pip_audit . --progress-spinner off`: passed, no known vulnerabilities found.
+- `python3 scripts/generate_api_reference.py --check`: passed.
+- `python3 -m build --outdir /tmp/aicontracts-task12-dist`: passed.
+- `python3 -m twine check /tmp/aicontracts-task12-dist/*`: passed.
 
 ### Task 13: Release Candidate And Final Release
 
@@ -691,7 +710,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 ### RC Gate
 
-Status: **BLOCKED until Tasks 1-11 are implemented.**
+Status: **BLOCKED until a real RC artifact is cut and the CI/release evidence below is attached.**
 
 Required evidence:
 
@@ -701,10 +720,11 @@ Required evidence:
 - Verdict schema tests pass.
 - GitHub Action smoke gate passes.
 - Changelog and migration notes are complete.
+- `RC_VALIDATION.md` is complete enough for external validators.
 
 ### External-User Gate
 
-Status: **BLOCKED until RC artifact and demo docs exist.**
+Status: **BLOCKED until RC artifact, external validators, and validation evidence exist.**
 
 Required evidence:
 
@@ -713,6 +733,7 @@ Required evidence:
 - Both run `validate` and `check-verdict`.
 - At least one uses the GitHub Action gate.
 - No P0/P1 adoption blocker remains open.
+- At least one real external developer runs the RC in their own project and records feedback.
 
 ### Final Release Gate
 
