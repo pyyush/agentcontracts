@@ -76,12 +76,40 @@ class TestContractEnforcer:
         loaded = load_verdict_artifact(verdict.artifacts["verdict_path"])
         assert loaded["outcome"] == "blocked"
 
+    def test_file_write_blocked_when_filesystem_authorization_omitted(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        del coding_contract_data["effects"]["authorized"]["filesystem"]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        with pytest.raises(ContractViolation, match="File write"):
+            enforcer.check_file_write("src/app.py")
+
+        verdict = enforcer.finalize_run()
+        assert verdict.outcome == "blocked"
+        assert verdict.violations[0]["violated_clause"] == "effects.authorized.filesystem.write"
+
     def test_shell_command_blocked(self, tmp_yaml, coding_contract_data, tmp_path: Path) -> None:
         contract = load_contract(tmp_yaml(coding_contract_data))
         enforcer = ContractEnforcer(contract, repo_root=tmp_path)
         with pytest.raises(ContractViolation, match="Shell command"):
             enforcer.check_shell_command("python -m mypy src")
         assert enforcer.finalize_run().outcome == "blocked"
+
+    def test_shell_command_blocked_when_shell_authorization_omitted(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        del coding_contract_data["effects"]["authorized"]["shell"]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        with pytest.raises(ContractViolation, match="Shell command"):
+            enforcer.check_shell_command("python -m pytest tests/test_app.py")
+
+        verdict = enforcer.finalize_run()
+        assert verdict.outcome == "blocked"
+        assert verdict.violations[0]["violated_clause"] == "effects.authorized.shell.commands"
 
     def test_shell_command_budget(self, tmp_yaml, coding_contract_data, tmp_path: Path) -> None:
         contract = load_contract(tmp_yaml(coding_contract_data))

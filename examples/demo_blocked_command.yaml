@@ -13,6 +13,9 @@ contract:
 
 effects:
   authorized:
+    filesystem:
+      read: []
+      write: []
     shell:
       commands:
         - "python -m pytest *"

@@ -91,11 +91,13 @@ effects:
 
 Rules:
 
-- tools, network, and state writes are default-deny when configured
-- filesystem read/write scopes are default-deny when configured
+- if `effects.authorized` is omitted entirely, effect authorization is unconfigured and runtimes may allow effects for compatibility
+- when `effects.authorized` is present, tools, network, and state writes are default-deny; omitted or empty lists authorize nothing
+- when `effects.authorized` is present, omitted `filesystem` or omitted `shell` sub-surfaces deny file and shell effects by default
+- filesystem read/write scopes are default-deny when configured; empty `read` or `write` lists authorize no paths for that operation
 - filesystem paths are resolved against the repo root before matching; allowlist globs compare only the canonical repo-relative path, so traversal strings such as `src/../.env` do not match `src/**`
 - filesystem paths that resolve outside the repo root are denied when filesystem authorization is configured
-- shell commands are matched against normalized command strings with glob patterns
+- shell commands are matched against normalized command strings with glob patterns; an empty `commands` list authorizes no shell commands
 - during delegation, authorized effects attenuate by intersection
 
 ## Budgets

@@ -112,6 +112,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** Value, Security, Stability, API quality, Docs, Tests
 
+**Status:** Complete in Phase 3 Task 3.
+
 **Estimate:** 2 cycles
 
 **Dependencies:** Task 2 should land first so filesystem behavior is safe before tightening defaults.
@@ -133,16 +135,25 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] Define `1.0.0` coding/build mode semantics: when `effects.authorized` is present, absent `tools`, `network`, `state_writes`, `filesystem`, and `shell` sub-surfaces are deny-by-default for their effect type.
-- [ ] Preserve backward compatibility only through explicit migration docs, not by keeping unsafe default-allow behavior.
-- [ ] Add tests that omit `filesystem` and `shell` and prove file/shell checks are denied.
-- [ ] Update examples to include intentional empty sub-surfaces where the user means "deny all".
+- [x] Define `1.0.0` coding/build mode semantics: when `effects.authorized` is present, absent `tools`, `network`, `state_writes`, `filesystem`, and `shell` sub-surfaces are deny-by-default for their effect type.
+- [x] Preserve backward compatibility only through explicit migration docs, not by keeping unsafe default-allow behavior.
+- [x] Add tests that omit `filesystem` and `shell` and prove file/shell checks are denied.
+- [x] Update examples to include intentional empty sub-surfaces where the user means "deny all".
 
 **Acceptance:**
 
 - Missing `filesystem` no longer allows arbitrary file reads/writes when effects authorization is configured.
 - Missing `shell` no longer allows arbitrary shell commands when effects authorization is configured.
 - Docs clearly distinguish "authorization absent entirely" from "authorization configured and sub-surface omitted".
+
+**Verification:** Completed for Phase 3 Task 3.
+
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 197 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- CLI smoke checks for `AGENT_CONTRACT.yaml`, `examples/support_triage.yaml`, and `check-compat examples/support_triage.yaml examples/support_triage.yaml`: passed.
+- Core `pip-audit`: no known vulnerabilities found.
+- Optional extras `pip-audit` with `langchain-core==1.2.28`, `openai-agents==0.13.5`, and `claude-agent-sdk==0.1.56`: no known vulnerabilities found.
 
 **Risks/blockers:**
 
@@ -521,7 +532,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 |---|---:|---|
 | Vulnerable optional `langchain-core==1.2.26` pin | Task 1 | Complete |
 | Filesystem path traversal canonicalization | Task 2 | Complete |
-| Fail-closed missing effect sub-surfaces | Task 3 | Planned, blocks release |
+| Fail-closed missing effect sub-surfaces | Task 3 | Complete |
 | `eval:` postconditions fake-green behavior | Task 4 | Planned, blocks release |
 | Spec/package version mismatch | Task 6 | Planned, blocks release |
 | Verdict schema validation | Task 5 | Planned, blocks release |
@@ -569,4 +580,4 @@ Required evidence:
 
 ## Phase 3 Starting Point
 
-Task 2 is complete. Continue Phase 3 with Task 3: enforce fail-closed missing effect sub-surfaces.
+Task 3 is complete. Continue Phase 3 with Task 4: eliminate `eval:` postcondition fake-green behavior.

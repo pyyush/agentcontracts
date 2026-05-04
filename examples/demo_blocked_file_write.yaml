@@ -16,6 +16,8 @@ effects:
     filesystem:
       read: ["src/**", "tests/**"]
       write: ["src/**"]
+    shell:
+      commands: []
     tools: []
     network: []
     state_writes: []

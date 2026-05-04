@@ -83,7 +83,7 @@ contract:
       check: "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0"
 ```
 
-Empty `tools`, `network`, and `state_writes` lists mean *default-deny*: the agent cannot use any tool, hit any network endpoint, or write to any tracked state unless you list it.
+When `effects.authorized` is present, every effect sub-surface is fail-closed. Empty `tools`, `network`, and `state_writes` lists mean the agent cannot use any tool, hit any network endpoint, or write to tracked state unless you list it. Omitted or empty `filesystem` and `shell` sub-surfaces deny file and shell effects by default. Leaving `effects.authorized` out entirely is the explicit unconfigured mode for compatibility and does not enforce effect gates.
 
 ### 2. Hook it into your agent runtime
 

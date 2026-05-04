@@ -145,18 +145,24 @@ class EffectGuard:
         return matches_any(scope, self._authorized.state_writes)
 
     def check_file_read(self, path: str) -> bool:
-        if self._authorized is None or self._authorized.filesystem is None:
+        if self._authorized is None:
             return True
+        if self._authorized.filesystem is None:
+            return False
         return self._filesystem_matches(path, self._authorized.filesystem.read)
 
     def check_file_write(self, path: str) -> bool:
-        if self._authorized is None or self._authorized.filesystem is None:
+        if self._authorized is None:
             return True
+        if self._authorized.filesystem is None:
+            return False
         return self._filesystem_matches(path, self._authorized.filesystem.write)
 
     def check_shell_command(self, command: str) -> bool:
-        if self._authorized is None or self._authorized.shell is None:
+        if self._authorized is None:
             return True
+        if self._authorized.shell is None:
+            return False
         # Strict reject: any chaining/redirection/substitution metachar
         # bypasses fnmatch's `*` and would let an attacker append payloads
         # after an allowlisted prefix. Scan the RAW command (not the

@@ -69,6 +69,16 @@ class TestEffectGuard:
         assert guard.check_file_write("src/main.py") is True
         assert guard.check_file_write("tests/test_main.py") is False
 
+    def test_configured_authorization_without_filesystem_denies_file_effects(self) -> None:
+        guard = EffectGuard(EffectsAuthorized(tools=["search"]))
+
+        assert guard.check_file_read("src/main.py") is False
+        assert guard.check_file_write("src/main.py") is False
+        with pytest.raises(EffectDeniedError, match="filesystem.read"):
+            guard.require_file_read("src/main.py")
+        with pytest.raises(EffectDeniedError, match="filesystem.write"):
+            guard.require_file_write("src/main.py")
+
     def test_filesystem_matches_canonical_repo_relative_paths(self, tmp_path: Path) -> None:
         guard = EffectGuard(
             EffectsAuthorized(
@@ -115,6 +125,13 @@ class TestEffectGuard:
         )
         assert guard.check_shell_command("python -m pytest tests/test_app.py") is True
         assert guard.check_shell_command("python -m mypy src") is False
+
+    def test_configured_authorization_without_shell_denies_shell_commands(self) -> None:
+        guard = EffectGuard(EffectsAuthorized(tools=["search"]))
+
+        assert guard.check_shell_command("python -m pytest tests/test_app.py") is False
+        with pytest.raises(EffectDeniedError, match="shell.command"):
+            guard.require_shell_command("python -m pytest tests/test_app.py")
 
     @pytest.mark.parametrize(
         "command",

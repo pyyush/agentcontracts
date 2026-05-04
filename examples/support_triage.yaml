@@ -78,6 +78,11 @@ effects:
       - "https://kb.internal/*"
     state_writes:
       - "tickets.*"
+    filesystem:
+      read: []
+      write: []
+    shell:
+      commands: []
 
   declared:
     tools:
