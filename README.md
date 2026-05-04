@@ -91,7 +91,7 @@ Postconditions are deterministic by default. `eval:*` checks are external evalua
 
 ### 2. Hook it into your agent runtime
 
-The Claude Agent SDK adapter forwards every tool call into the enforcer — no manual instrumentation:
+The Claude Agent SDK adapter forwards observable tool calls into the enforcer and provides an explicit verdict finalizer:
 
 ```python
 from agent_contracts import load_contract
@@ -102,11 +102,16 @@ contract = load_contract("AGENT_CONTRACT.yaml")
 hooks = ContractHooks(contract)
 
 options = ClaudeAgentOptions(hooks=hooks.get_hooks_config())
-async for message in query(prompt="refactor src/app.py", options=options):
-    if hasattr(message, "total_cost_usd"):
-        hooks.track_result(message)
-
-verdict = hooks.enforcer.finalize_run(output={"status": "done"})
+error = None
+try:
+    async for message in query(prompt="refactor src/app.py", options=options):
+        if hasattr(message, "total_cost_usd"):
+            hooks.track_result(message)
+except Exception as exc:
+    error = exc
+    raise
+finally:
+    verdict = hooks.finalize_run(output={"status": "done"}, execution_error=error)
 print(verdict.outcome)  # pass | warn | blocked | fail
 ```
 
@@ -123,7 +128,7 @@ aicontracts check-verdict .agent-contracts/runs/<run-id>/verdict.json
 
 ## Verdict artifacts
 
-Every meaningful run emits one schema-backed artifact. The public schema lives at `schemas/verdict.schema.json`, with the packaged runtime copy at `src/agent_contracts/schemas/verdict.schema.json`.
+Every meaningful governed run should be finalized with one schema-backed artifact. The public schema lives at `schemas/verdict.schema.json`, with the packaged runtime copy at `src/agent_contracts/schemas/verdict.schema.json`.
 
 ```json
 {
@@ -215,6 +220,18 @@ The core (contract, CLI, verdict artifact, GitHub Action) is framework-agnostic 
 All three SDK extras require Python 3.10+. The core package supports Python 3.9+.
 
 In-runtime adapters add hard-stop coverage where the host exposes a pre-execution hook, but enforcement completeness still depends on the host's hook surface. The CI verdict gate is what makes enforcement total: every merge runs the same evaluator against the same contract, regardless of which framework, model, or runtime produced the run.
+
+### Adapter verdict behavior
+
+All adapters expose `finalize_run(...)`, return a schema-backed `RunVerdict`, and write the verdict artifact through the same enforcer used by the CLI gate. If finalization happens before the adapter sees host completion, or completion is observed without any output or execution error, the verdict records a required adapter check failure instead of passing silently.
+
+| Adapter | Run start | Pre-execution checks | Finalization |
+|---|---|---|---|
+| Claude Agent SDK | `ContractHooks` allocates the run id when constructed; the SDK does not expose a separate run-end hook here. | `PreToolUse` can deny generic tools and common inspectable native effects before execution: `Read`, `Write`, `Edit`, `MultiEdit`, `NotebookEdit`, `Bash`, and `WebFetch` when the hook payload contains the path, command, or URL. | Call `hooks.finalize_run(...)` after the query loop, preferably in `finally`. `track_result(...)` records cost/token usage and marks host completion observed, but does not finalize by itself. |
+| OpenAI Agents SDK | `ContractRunHooks` allocates the run id when constructed; `on_agent_start` marks host execution observed. | `on_tool_start` can deny generic tool names before tool execution, but after the model has already chosen the tool. This hook surface does not expose file paths, shell commands, or URLs, so native effect arguments are not checkable here. | `on_agent_end` validates output, evaluates postconditions, and finalizes. Surrounding code should call `hooks.finalize_run(execution_error=exc)` when the host raises before `on_agent_end`. |
+| LangChain | `ContractCallbackHandler` allocates the run id when constructed. | `on_tool_start` can deny generic tool names and conventional local wrappers such as `bash`, `read_file`, `write_file`, and `web_fetch` when the input string contains the command, path, or URL. | `on_chain_end` validates output, evaluates postconditions, and finalizes. Surrounding code should call `handler.finalize_run(execution_error=exc)` when the chain raises before `on_chain_end`. |
+
+OpenAI and LangChain strict mode raises `AdapterVerdictError` when their completion callback finalizes to `blocked` or `fail`. Claude pre-tool denials return the SDK's structured deny response; the final verdict still becomes `blocked` when finalized. Unsupported or unobserved effects must be caught by repo checks and `check-verdict` in CI.
 
 ### Post-1.0 roadmap
 

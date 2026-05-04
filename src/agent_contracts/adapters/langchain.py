@@ -11,7 +11,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from agent_contracts.enforcer import ContractEnforcer, ContractViolation
+from agent_contracts.adapters._shared import (
+    check_observed_effect,
+    finalize_adapter_run,
+    installed_package_version,
+    raise_if_blocking_verdict,
+)
+from agent_contracts.enforcer import ContractEnforcer, ContractViolation, RunVerdict
 from agent_contracts.loader import load_contract
 from agent_contracts.types import Contract
 from agent_contracts.violations import ViolationEvent
@@ -29,7 +35,18 @@ class ContractCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
     """LangChain callback handler that enforces an agent contract.
 
     Intercepts tool calls for effect gating and budget tracking.
-    Validates outputs against the contract's output schema.
+    Validates outputs against the contract's output schema and writes a verdict.
+
+    Run lifecycle:
+    - the contract run id is allocated when this object is created
+    - on_tool_start can block generic tools before execution
+    - on_tool_start can also block inspectable native shell, file, and network
+      effects when local tool wrappers use conventional names such as
+      bash/read_file/write_file/web_fetch and pass the effect target as input
+    - on_chain_end validates output, evaluates postconditions, and writes the
+      verdict artifact
+    - finalize_run() can be called from a surrounding exception handler to
+      write a failed verdict for unexpected host errors
     """
 
     def __init__(
@@ -44,8 +61,11 @@ class ContractCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
             contract,
             violation_destination=violation_destination,
             violation_callback=violation_callback,
+            host_name="langchain",
+            host_version=installed_package_version("langchain-core"),
         )
         self._raise_on_violation = raise_on_violation
+        self._observed_completion = False
 
     @classmethod
     def from_file(
@@ -80,8 +100,14 @@ class ContractCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
         """Called when a tool starts — enforce effect authorization and budget."""
         tool_name = serialized.get("name", "")
         try:
-            self._enforcer.check_tool_call(tool_name)
-        except ContractViolation:
+            if not check_observed_effect(
+                self._enforcer,
+                tool_name=str(tool_name),
+                tool_input=input_str,
+            ):
+                self._enforcer.check_tool_call(str(tool_name))
+        except ContractViolation as exc:
+            self.finalize_run(execution_error=exc)
             if self._raise_on_violation:
                 raise
 
@@ -90,12 +116,10 @@ class ContractCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
         pass
 
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
-        """Called when the chain finishes — validate output and postconditions."""
-        output_errors = self._enforcer.validate_output(outputs)
-        if output_errors and self._raise_on_violation:
-            raise ContractViolation(f"Output validation failed: {output_errors}")
-
-        self._enforcer.evaluate_postconditions(outputs)
+        """Called when the chain finishes — finalize the verdict artifact."""
+        self._observed_completion = True
+        verdict = self.finalize_run(output=outputs)
+        raise_if_blocking_verdict(verdict, enabled=self._raise_on_violation)
 
     def on_llm_end(self, response: Any, **kwargs: Any) -> None:
         """Called when LLM finishes — track token usage."""
@@ -103,4 +127,29 @@ class ContractCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
             usage = response.llm_output.get("token_usage", {})
             total = usage.get("total_tokens", 0)
             if total > 0:
-                self._enforcer.add_tokens(total)
+                try:
+                    self._enforcer.add_tokens(total)
+                except ContractViolation as exc:
+                    self.finalize_run(execution_error=exc)
+                    if self._raise_on_violation:
+                        raise
+
+    def finalize_run(
+        self,
+        *,
+        output: Any = None,
+        extra_context: Optional[Dict[str, Any]] = None,
+        artifact_path: Optional[Union[str, Path]] = None,
+        execution_error: Optional[BaseException] = None,
+    ) -> RunVerdict:
+        """Write and return the schema-backed verdict artifact for this run."""
+        observed_completion = self._observed_completion or output is not None or execution_error is not None
+        return finalize_adapter_run(
+            self._enforcer,
+            adapter_name="LangChain adapter",
+            observed_completion=observed_completion,
+            output=output,
+            extra_context=extra_context,
+            artifact_path=artifact_path,
+            execution_error=execution_error,
+        )

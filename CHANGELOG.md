@@ -14,10 +14,13 @@ All notable changes to this project are tracked here.
 ### Added
 
 - added a JSON Schema for verdict artifacts and made `check-verdict` validate artifacts before outcome gating
+- added explicit adapter verdict finalizers for Claude Agent SDK, OpenAI Agents SDK, and LangChain integrations
+- added adapter lifecycle tests covering schema-valid pass, blocked, failed-output, and unexpected-error verdict paths
 
 ### Changed
 
 - changed canonical contracts and examples to declare `agent_contract: "1.0.0"` for the stable spec
+- changed OpenAI Agents SDK and LangChain completion callbacks to finalize verdict artifacts instead of only evaluating postconditions in memory
 
 ### Security
 

@@ -8,8 +8,10 @@ from typing import Any, Dict
 import pytest
 import yaml
 
+from agent_contracts.adapters import AdapterVerdictError
 from agent_contracts.adapters.langchain import ContractCallbackHandler
 from agent_contracts.enforcer import ContractViolation
+from agent_contracts.schema import validate_verdict_against_schema
 
 
 @pytest.fixture
@@ -58,9 +60,63 @@ class TestContractCallbackHandler:
 
     def test_chain_end_postconditions(self, handler) -> None:
         handler.on_chain_end({"result": "something"})  # Should pass
+        verdict = handler.enforcer.finalized_verdict
+        assert verdict is not None
+        assert verdict.outcome == "pass"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
 
     def test_on_tool_end(self, handler) -> None:
         handler.on_tool_end("result")  # No-op, should not raise
+
+    def test_native_shell_effect_is_checked(self, handler) -> None:
+        handler.on_tool_start({"name": "bash"}, "python -m pytest tests")
+        with pytest.raises(ContractViolation, match="Shell command"):
+            handler.on_tool_start({"name": "bash"}, "rm -rf /")
+
+    def test_blocked_tool_finalizes_schema_valid_verdict(self, handler) -> None:
+        with pytest.raises(ContractViolation):
+            handler.on_tool_start({"name": "delete_all"}, "query")
+
+        verdict = handler.enforcer.finalized_verdict
+        assert verdict is not None
+        assert verdict.outcome == "blocked"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_failed_output_finalizes_schema_valid_verdict(self, tmp_path, tier1_data) -> None:
+        p = tmp_path / "contract.yaml"
+        p.write_text(yaml.dump(tier1_data, sort_keys=False), encoding="utf-8")
+        h = ContractCallbackHandler.from_file(p, raise_on_violation=False)
+
+        h.on_chain_end({"result": 123})
+
+        verdict = h.enforcer.finalized_verdict
+        assert verdict is not None
+        assert verdict.outcome == "fail"
+        assert any(check.name == "adapter.output_schema" for check in verdict.checks)
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_failed_output_raises_typed_error_in_strict_mode(self, handler) -> None:
+        with pytest.raises(AdapterVerdictError, match="outcome=fail"):
+            handler.on_chain_end({"result": 123})
+
+        verdict = handler.enforcer.finalized_verdict
+        assert verdict is not None
+        assert verdict.outcome == "fail"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_unexpected_error_finalizes_schema_valid_verdict(self, handler, tmp_path) -> None:
+        verdict = handler.finalize_run(
+            execution_error=RuntimeError("boom"),
+            artifact_path=tmp_path / "error.json",
+        )
+        assert verdict.outcome == "fail"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_finalize_without_observed_output_fails_closed(self, handler, tmp_path) -> None:
+        verdict = handler.finalize_run(artifact_path=tmp_path / "partial.json")
+        assert verdict.outcome == "fail"
+        assert any(check.name == "adapter.observed_completion" for check in verdict.checks)
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
 
 
 class TestRealSDKIntegration:

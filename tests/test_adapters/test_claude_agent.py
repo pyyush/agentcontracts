@@ -11,6 +11,7 @@ import pytest
 import yaml
 
 from agent_contracts.adapters.claude_agent import ContractHooks
+from agent_contracts.schema import validate_verdict_against_schema
 
 
 @pytest.fixture
@@ -113,6 +114,63 @@ class TestContractHooks:
             "tool_input": {},
         }))
         assert len(hooks.violations) == 1
+
+    def test_native_shell_effect_is_checked(self, hooks) -> None:
+        result = run_async(hooks.pre_tool_use({
+            "tool_name": "Bash",
+            "tool_input": {"command": "python -m pytest tests"},
+        }))
+        assert result == {}
+
+        blocked = run_async(hooks.pre_tool_use({
+            "tool_name": "Bash",
+            "tool_input": {"command": "rm -rf /"},
+        }))
+        assert blocked["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "Shell command" in blocked["hookSpecificOutput"]["permissionDecisionReason"]
+
+    def test_finalize_pass_verdict_is_schema_valid(self, hooks, tmp_path) -> None:
+        verdict = hooks.finalize_run(
+            output={"result": "ok"},
+            artifact_path=tmp_path / "verdict.json",
+        )
+        assert verdict.outcome == "pass"
+        assert verdict.host["name"] == "claude-agent-sdk"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+        assert (tmp_path / "verdict.json").exists()
+
+    def test_finalize_blocked_verdict_is_schema_valid(self, hooks, tmp_path) -> None:
+        run_async(hooks.pre_tool_use({"tool_name": "unauthorized", "tool_input": {}}))
+
+        verdict = hooks.finalize_run(
+            output={"result": "ok"},
+            artifact_path=tmp_path / "blocked.json",
+        )
+        assert verdict.outcome == "blocked"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_finalize_failed_output_verdict_is_schema_valid(self, hooks, tmp_path) -> None:
+        verdict = hooks.finalize_run(
+            output={"result": 123},
+            artifact_path=tmp_path / "failed.json",
+        )
+        assert verdict.outcome == "fail"
+        assert any(check.name == "adapter.output_schema" for check in verdict.checks)
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_finalize_unexpected_error_verdict_is_schema_valid(self, hooks, tmp_path) -> None:
+        verdict = hooks.finalize_run(
+            execution_error=RuntimeError("boom"),
+            artifact_path=tmp_path / "error.json",
+        )
+        assert verdict.outcome == "fail"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_finalize_without_observed_output_fails_closed(self, hooks, tmp_path) -> None:
+        verdict = hooks.finalize_run(artifact_path=tmp_path / "partial.json")
+        assert verdict.outcome == "fail"
+        assert any(check.name == "adapter.observed_completion" for check in verdict.checks)
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
 
 
 class TestRealSDKIntegration:

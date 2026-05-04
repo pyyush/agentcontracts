@@ -315,6 +315,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** Value, Stability, Observability, Docs, Tests
 
+**Status:** Complete in Phase 3 Task 7.
+
 **Estimate:** 3 cycles
 
 **Dependencies:** Task 5 should land first so adapters emit schema-valid artifacts.
@@ -330,10 +332,27 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] For each adapter, define exactly when the run starts, when tool/file/shell/network effects are checkable, and when verdict finalization happens.
-- [ ] Add explicit finalization helpers if host hooks cannot guarantee finalization automatically.
-- [ ] Ensure adapter examples call finalization reliably.
-- [ ] Test pass, blocked, failed, and unexpected-error paths for each adapter where host SDK APIs allow.
+- [x] For each adapter, define exactly when the run starts, when tool/file/shell/network effects are checkable, and when verdict finalization happens.
+- [x] Add explicit finalization helpers if host hooks cannot guarantee finalization automatically.
+- [x] Ensure adapter examples call finalization reliably.
+- [x] Test pass, blocked, failed, and unexpected-error paths for each adapter where host SDK APIs allow.
+
+**Behavior:**
+
+- Claude Agent SDK: `PreToolUse` can deny generic tools and common inspectable native effects before execution; callers must call `finalize_run()` after the query loop because this adapter has no host run-end hook.
+- OpenAI Agents SDK: `on_tool_start` can deny generic tool names before tool execution, after the model has selected the tool; native file/shell/network arguments are not visible in this hook surface; `on_agent_end` finalizes.
+- LangChain: `on_tool_start` can deny generic tools and conventional inspectable native wrappers such as `bash`, `read_file`, `write_file`, and `web_fetch`; `on_chain_end` finalizes.
+- Adapter finalization records required failure checks when completion or output was not observed, so partially observed runs do not pass silently.
+
+**Verification:**
+
+- `python3 -m pytest tests/test_adapters -q`: passed, optional real-SDK checks skipped when SDK packages were absent.
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 228 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- CLI smoke checks passed: `validate AGENT_CONTRACT.yaml`, `validate examples/support_triage.yaml`, and `check-compat examples/support_triage.yaml examples/support_triage.yaml`.
+- `python3 -m pip_audit . --progress-spinner off`: passed, no known vulnerabilities found.
+- `git diff --check`: passed.
 
 **Acceptance:**
 
@@ -343,7 +362,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Risks/blockers:**
 
-- Some hosts may not expose pre-execution hooks for every effect type. Document and rely on CI verdict gating where hard stops are impossible.
+- No Task 7 blocker remains. OpenAI Agents SDK does not expose native file/shell/network arguments through the hook surface used here, so those effects remain CI-gated unless users wrap them as named tools.
 
 ### Task 8: Harden CLI And GitHub Action Gate
 
@@ -578,7 +597,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 | `eval:` postconditions fake-green behavior | Task 4 | Complete |
 | Spec/package version mismatch | Task 6 | Complete |
 | Verdict schema validation | Task 5 | Complete |
-| Adapter verdict finalization | Task 7 | Planned, blocks release |
+| Adapter verdict finalization | Task 7 | Complete |
 | Docs/security/perf/release hygiene | Tasks 9-13 | Planned, blocks release |
 
 ## RC, External-User, And Release Gates
@@ -622,4 +641,4 @@ Required evidence:
 
 ## Phase 3 Starting Point
 
-Task 6 is complete. Continue Phase 3 with Task 7: adapter verdict behavior.
+Task 7 is complete. Continue Phase 3 with Task 8: harden CLI and GitHub Action gate.

@@ -17,7 +17,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from agent_contracts.enforcer import ContractEnforcer, ContractViolation
+from agent_contracts.adapters._shared import (
+    check_observed_effect,
+    finalize_adapter_run,
+    installed_package_version,
+)
+from agent_contracts.enforcer import ContractEnforcer, ContractViolation, RunVerdict
 from agent_contracts.loader import load_contract
 from agent_contracts.types import Contract
 from agent_contracts.violations import ViolationEvent
@@ -29,8 +34,15 @@ class ContractHooks:
     Generates async callables for PreToolUse and PostToolUse that can be
     passed to ClaudeAgentOptions hooks configuration.
 
-    PreToolUse returns structured deny for unauthorized tools.
-    PostToolUse tracks tool calls against budget.
+    Run lifecycle:
+    - the contract run id is allocated when this object is created
+    - PreToolUse can block generic tools before execution
+    - PreToolUse can also block inspectable native file, shell, and network
+      effects for common Claude tool payloads (Read/Write/Edit/Bash/WebFetch)
+    - PostToolUse currently observes completion only
+    - callers must call finalize_run() after the query loop, preferably in a
+      finally block; track_result() marks the host completion observed but does
+      not finalize by itself
     """
 
     def __init__(
@@ -44,7 +56,10 @@ class ContractHooks:
             contract,
             violation_destination=violation_destination,
             violation_callback=violation_callback,
+            host_name="claude-agent-sdk",
+            host_version=installed_package_version("claude-agent-sdk"),
         )
+        self._observed_completion = False
 
     @classmethod
     def from_file(
@@ -77,16 +92,22 @@ class ContractHooks:
         Returns empty dict to allow execution.
         """
         tool_name = input_data.get("tool_name", "")
+        tool_input = input_data.get("tool_input", {})
 
         try:
-            self._enforcer.check_tool_call(tool_name)
-        except ContractViolation:
+            if not check_observed_effect(
+                self._enforcer,
+                tool_name=str(tool_name),
+                tool_input=tool_input,
+            ):
+                self._enforcer.check_tool_call(str(tool_name))
+        except ContractViolation as exc:
             return {
                 "hookSpecificOutput": {
                     "hookEventName": input_data.get("hook_event_name", "PreToolUse"),
                     "permissionDecision": "deny",
                     "permissionDecisionReason": (
-                        f"Tool '{tool_name}' not authorized by agent contract "
+                        f"{exc} Agent contract: "
                         f"'{self._enforcer.contract.identity.name}'"
                     ),
                 }
@@ -122,14 +143,45 @@ class ContractHooks:
                 if hasattr(message, 'total_cost_usd'):
                     hooks.track_result(message)
         """
+        self._observed_completion = True
         cost = getattr(result_message, "total_cost_usd", None)
-        if cost is not None and cost > 0:
-            self._enforcer.add_cost(cost)
+        try:
+            if cost is not None and cost > 0:
+                self._enforcer.add_cost(cost)
 
-        usage = getattr(result_message, "usage", None)
-        if isinstance(usage, dict):
-            input_tokens = usage.get("input_tokens", 0)
-            output_tokens = usage.get("output_tokens", 0)
-            total = input_tokens + output_tokens
-            if total > 0:
-                self._enforcer.add_tokens(total)
+            usage = getattr(result_message, "usage", None)
+            if isinstance(usage, dict):
+                input_tokens = usage.get("input_tokens", 0)
+                output_tokens = usage.get("output_tokens", 0)
+                total = input_tokens + output_tokens
+                if total > 0:
+                    self._enforcer.add_tokens(total)
+        except ContractViolation as exc:
+            self.finalize_run(execution_error=exc)
+            raise
+
+    def finalize_run(
+        self,
+        *,
+        output: Any = None,
+        extra_context: Optional[Dict[str, Any]] = None,
+        artifact_path: Optional[Union[str, Path]] = None,
+        execution_error: Optional[BaseException] = None,
+    ) -> RunVerdict:
+        """Write and return the schema-backed verdict artifact for this run.
+
+        Pass the final agent output whenever the host exposes it. If no output
+        or execution error is supplied before completion is observed, the
+        verdict records a required adapter observation failure instead of
+        silently passing.
+        """
+        observed_completion = self._observed_completion or output is not None or execution_error is not None
+        return finalize_adapter_run(
+            self._enforcer,
+            adapter_name="Claude Agent SDK adapter",
+            observed_completion=observed_completion,
+            output=output,
+            extra_context=extra_context,
+            artifact_path=artifact_path,
+            execution_error=execution_error,
+        )
