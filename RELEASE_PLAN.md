@@ -677,7 +677,10 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Risks/blockers:**
 
-- RC gate must remain blocked until a real RC artifact, registry/provenance path, GitHub CI matrix, and external validation evidence exist.
+- RC gate must remain blocked until a real RC artifact, artifact checksums,
+  PyPI trusted publishing/provenance and release-owner confirmation, remote
+  GitHub CI matrix evidence for the current release commit, and external
+  validation evidence exist.
 
 **Task 13 preparation verification:** Completed for local pre-RC self-blockers.
 
@@ -687,6 +690,17 @@ One cycle means one focused implementation pass with tests and local verificatio
 - `tests/test_release_workflow.py` verifies the release workflow prerelease detection and `softprops/action-gh-release` wiring.
 - `pyproject.toml` now uses `Development Status :: 5 - Production/Stable` for the planned stable package metadata.
 - `RC_VALIDATION.md` documents the required RC action override and no longer lists the lack of an RC-capable action ref as a local blocker.
+- Remote repository settings were configured for `pyyush/agentcontracts` on
+  2026-05-04: `main` requires one approving review, CODEOWNERS review, stale
+  review dismissal, conversation resolution, linear history, no force-pushes or
+  branch deletion, administrator enforcement, and required status contexts
+  `test (3.9)`, `test (3.10)`, `test (3.11)`, `test (3.12)`, and
+  `test (3.13)`.
+- Dependabot vulnerability alerts and security updates, secret scanning, push
+  protection, and private vulnerability reporting are enabled.
+- Local `npm whoami` is `pyyush`, but `agent-contracts` publishes
+  `aicontracts` to PyPI, so npm identity is not release authorization evidence
+  for this package.
 
 ## Dependency Graph
 
@@ -715,7 +729,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 | Spec/package version mismatch | Task 6 | Complete |
 | Verdict schema validation | Task 5 | Complete |
 | Adapter verdict finalization | Task 7 | Complete |
-| Docs/security/perf/release hygiene | Tasks 9-13 | Planned, blocks release |
+| Docs/security/perf/release hygiene | Tasks 9-13 | Local prep complete; RC artifact, remote CI, PyPI publishing, and external validation still block release |
 
 ## RC, External-User, And Release Gates
 
@@ -727,6 +741,9 @@ Required evidence:
 
 - Full local canonical gates pass.
 - GitHub CI matrix passes on Python 3.9, 3.10, 3.11, 3.12, 3.13.
+- Remote CI evidence is linked for the current release commit with required
+  status contexts `test (3.9)`, `test (3.10)`, `test (3.11)`, `test (3.12)`,
+  and `test (3.13)`.
 - Core and optional extras dependency audits pass.
 - Verdict schema tests pass.
 - GitHub Action smoke gate passes.
@@ -756,6 +773,7 @@ Required evidence:
 - PyPI wheel and sdist are built and checked.
 - GitHub release notes include breaking changes and security notes.
 - Public docs do not overclaim adapter enforcement coverage.
+- PyPI trusted publishing/provenance and release-owner authority are confirmed.
 - Release owner signs off on DoD sections: Value, API quality, Stability, Tests, Security, Performance, Docs, Release & distribution, Repo hygiene, Observability.
 
 ## Phase 3 Starting Point

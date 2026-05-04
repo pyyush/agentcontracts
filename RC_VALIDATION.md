@@ -235,15 +235,40 @@ The RC must not advance to final release if any of these are true:
 - the GitHub Action cannot run the documented validate/check-verdict path
 - any P0/P1 adoption blocker remains open
 
+## Remote Repository Settings Evidence
+
+Release-owner configuration update recorded on 2026-05-04 for
+`pyyush/agentcontracts`:
+
+- `main` branch protection requires one approving review.
+- CODEOWNERS review is required.
+- stale approving reviews are dismissed after new commits.
+- conversations must be resolved before merge.
+- linear history is required.
+- force-pushes and branch deletion are disabled.
+- branch protection is enforced for administrators.
+- required status contexts are `test (3.9)`, `test (3.10)`,
+  `test (3.11)`, `test (3.12)`, and `test (3.13)`.
+- Dependabot vulnerability alerts and security updates are enabled.
+- secret scanning and push protection are enabled.
+- private vulnerability reporting is enabled.
+
+Local registry context: `npm whoami` is `pyyush`, but this project publishes
+the `aicontracts` package to PyPI. npm identity is not release authorization
+evidence for this package.
+
 ## Known Blockers Before Final Release
 
-- No `1.0.0` RC package, git tag, or GitHub release has been cut.
+- No `1.0.0` RC package, git tag, GitHub release, or artifact checksums have
+  been cut or recorded.
 - No external developer validation has been recorded.
 - No GitHub Action RC run has been linked from an external repo.
 - No GitHub Action RC run has installed and validated a real RC artifact yet.
-- Registry credentials and trusted publishing/provenance still need release-owner
-  verification.
-- Branch protection and required CI status must be confirmed in GitHub settings.
+- PyPI trusted publishing/provenance and release-owner authority still need
+  confirmation before publishing.
+- No remote GitHub Actions matrix run is linked for the current release commit
+  across `test (3.9)`, `test (3.10)`, `test (3.11)`, `test (3.12)`, and
+  `test (3.13)`.
 - Final PyPI and GitHub releases must not happen until the external-user gate
   above is satisfied.
 
