@@ -207,6 +207,20 @@ SemVer stability covers:
 
 Major releases may make incompatible changes to those surfaces. Minor releases add backward-compatible capabilities. Patch releases fix bugs, security issues, and documentation without changing stable semantics.
 
+## Performance guardrails
+
+The `1.0.0` release tracks concrete budgets for the hot paths that decide
+whether a governed run can finish: effect authorization, postcondition
+evaluation, and trace-to-contract bootstrap. The baseline artifact lives at
+`benchmarks/performance-baselines.json`, the release notes for the budgets
+live in `benchmarks/README.md`, and the budgets are enforced by
+`tests/test_performance_baselines.py` as part of the standard pytest suite.
+
+Current release budgets are intentionally conservative: 10,000 mixed effect
+checks must complete within 1.5 seconds, 1,000 postconditions within 300 ms,
+and bootstrapping 2,500 JSONL traces within 750 ms. Tightening or loosening
+those budgets is a release-plan decision, not an incidental test edit.
+
 ## Framework adapters (optional)
 
 The core (contract, CLI, verdict artifact, GitHub Action) is framework-agnostic and provider-agnostic. Adapters are optional ergonomic helpers that wire in-runtime hook calls into the same enforcer. Each is pinned to a specific SDK version and tested against the real SDK in CI.

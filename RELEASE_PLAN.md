@@ -496,10 +496,30 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] Add repeatable benchmarks for 1, 100, and 10,000 effect checks.
-- [ ] Add baseline for postcondition evaluation with small and large postcondition sets.
-- [ ] Add trace bootstrap benchmark for large JSONL traces.
-- [ ] Define acceptable thresholds and document them as release guardrails.
+- [x] Add repeatable benchmarks for 1, 100, and 10,000 effect checks.
+- [x] Add baseline for postcondition evaluation with small and large postcondition sets.
+- [x] Add trace bootstrap benchmark for large JSONL traces.
+- [x] Define acceptable thresholds and document them as release guardrails.
+
+**Results:**
+
+- Added `benchmarks/performance-baselines.json` with concrete local baselines and conservative release budgets for effect authorization, postcondition evaluation, and JSONL trace bootstrap.
+- Added `tests/test_performance_baselines.py`, which runs in the normal pytest suite and enforces the release budgets.
+- Documented the release guardrails in `benchmarks/README.md` and summarized the enforced budgets in `README.md`.
+- Local baseline medians on May 4, 2026: 1 effect check 0.004 ms, 100 effect checks 2.47 ms, 10,000 effect checks 200.45 ms, 5 postconditions 0.10 ms, 1,000 postconditions 19.31 ms, and 2,500 JSONL trace bootstrap 28.24 ms.
+
+**Verification:**
+
+- `python3 -m pip install -e ".[dev]"`: passed.
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest tests/test_performance_baselines.py -q`: failed before the baseline artifact existed, then passed after adding it.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 237 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- `python3 -m agent_contracts.cli validate AGENT_CONTRACT.yaml`: passed.
+- `python3 -m agent_contracts.cli validate examples/support_triage.yaml`: passed.
+- `python3 -m agent_contracts.cli check-compat examples/support_triage.yaml examples/support_triage.yaml`: passed.
+- `python3 -m pip index versions aicontracts`: PyPI latest verified as `0.2.0`; local editable install is `1.0.0`.
+- `python3 -m pip_audit . --progress-spinner off`: passed, no known vulnerabilities found.
 
 **Acceptance:**
 

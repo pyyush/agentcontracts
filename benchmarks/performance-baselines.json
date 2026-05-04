@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "recorded_at": "2026-05-04",
+    "python": "macOS system python3",
+    "purpose": "Release performance budgets for aicontracts 1.0.0 hot paths."
+  },
+  "effect_checks": {
+    "1": {
+      "baseline_ms": 0.004,
+      "max_ms": 25
+    },
+    "100": {
+      "baseline_ms": 2.47,
+      "max_ms": 75
+    },
+    "10000": {
+      "baseline_ms": 200.45,
+      "max_ms": 1500
+    }
+  },
+  "postconditions": {
+    "small": {
+      "count": 5,
+      "baseline_ms": 0.1,
+      "max_ms": 25
+    },
+    "large": {
+      "count": 1000,
+      "baseline_ms": 19.31,
+      "max_ms": 300
+    }
+  },
+  "trace_bootstrap": {
+    "large_jsonl": {
+      "trace_count": 2500,
+      "baseline_ms": 28.24,
+      "max_ms": 750
+    }
+  }
+}
