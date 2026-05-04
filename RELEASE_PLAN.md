@@ -68,6 +68,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** Security, Stability, Tests, API quality
 
+**Status:** Complete in Phase 3 Task 2.
+
 **Estimate:** 2 cycles
 
 **Dependencies:** None
@@ -82,10 +84,10 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] Make filesystem authorization compare only canonical repo-relative paths plus clearly documented absolute paths inside the repo.
-- [ ] Reject or deny paths that resolve outside the repo root.
-- [ ] Add regression tests for `src/../.env`, absolute outside paths, symlink-like traversal cases where feasible, and normal allowed repo paths.
-- [ ] Keep glob semantics stable for legitimate `src/**`, `tests/**`, and exact-file patterns.
+- [x] Make filesystem authorization compare only canonical repo-relative paths plus clearly documented absolute paths inside the repo.
+- [x] Reject or deny paths that resolve outside the repo root.
+- [x] Add regression tests for `src/../.env`, absolute outside paths, symlink-like traversal cases where feasible, and normal allowed repo paths.
+- [x] Keep glob semantics stable for legitimate `src/**`, `tests/**`, and exact-file patterns.
 
 **Acceptance:**
 
@@ -509,7 +511,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 | Audit blocker | Handling task | Status |
 |---|---:|---|
 | Vulnerable optional `langchain-core==1.2.26` pin | Task 1 | Complete |
-| Filesystem path traversal canonicalization | Task 2 | Planned, blocks release |
+| Filesystem path traversal canonicalization | Task 2 | Complete |
 | Fail-closed missing effect sub-surfaces | Task 3 | Planned, blocks release |
 | `eval:` postconditions fake-green behavior | Task 4 | Planned, blocks release |
 | Spec/package version mismatch | Task 6 | Planned, blocks release |
@@ -558,4 +560,4 @@ Required evidence:
 
 ## Phase 3 Starting Point
 
-Task 1 is complete. Continue Phase 3 with Task 2: fix filesystem path canonicalization.
+Task 2 is complete. Continue Phase 3 with Task 3: enforce fail-closed missing effect sub-surfaces.

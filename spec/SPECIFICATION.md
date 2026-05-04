@@ -93,6 +93,8 @@ Rules:
 
 - tools, network, and state writes are default-deny when configured
 - filesystem read/write scopes are default-deny when configured
+- filesystem paths are resolved against the repo root before matching; allowlist globs compare only the canonical repo-relative path, so traversal strings such as `src/../.env` do not match `src/**`
+- filesystem paths that resolve outside the repo root are denied when filesystem authorization is configured
 - shell commands are matched against normalized command strings with glob patterns
 - during delegation, authorized effects attenuate by intersection
 
