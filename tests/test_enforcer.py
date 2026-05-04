@@ -16,6 +16,7 @@ from agent_contracts.enforcer import (
 )
 from agent_contracts.loader import load_contract
 from agent_contracts.postconditions import PostconditionError
+from agent_contracts.schema import get_verdict_schema, validate_verdict_against_schema
 
 
 @pytest.fixture
@@ -212,6 +213,23 @@ class TestContractEnforcer:
         payload = json.loads(verdict_path.read_text(encoding="utf-8"))
         assert payload["final_gate"] == "allowed"
         assert payload["budgets"]["shell_commands"] == 0
+
+    def test_generated_verdict_matches_schema(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path, host_name="pytest")
+        enforcer.record_check("pytest", "pass", exit_code=0)
+        enforcer.record_check("ruff", "pass", exit_code=0)
+
+        verdict = enforcer.finalize_run(output={"status": "done"})
+
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_public_and_packaged_verdict_schemas_match(self) -> None:
+        public_schema_path = Path(__file__).resolve().parents[1] / "schemas" / "verdict.schema.json"
+
+        assert json.loads(public_schema_path.read_text(encoding="utf-8")) == get_verdict_schema()
 
     def test_cost_budget(self, enforcer_tier1) -> None:
         enforcer_tier1.add_cost(0.30)

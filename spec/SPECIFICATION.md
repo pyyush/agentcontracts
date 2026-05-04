@@ -150,6 +150,11 @@ observability:
 The path may contain `{run_id}`.
 If omitted, runtimes may default to `.agent-contracts/runs/{run_id}/verdict.json`.
 
+Verdict artifacts are validated by the JSON Schema at `schemas/verdict.schema.json`.
+The packaged Python runtime uses the identical copy at
+`src/agent_contracts/schemas/verdict.schema.json`. `check-verdict` rejects artifacts
+that do not match this schema before it evaluates `outcome` or `final_gate`.
+
 Verdict artifacts include:
 
 - contract identity + spec version
@@ -160,6 +165,8 @@ Verdict artifacts include:
 - executed checks
 - budget snapshot
 - artifact metadata
+- timestamp
+- warnings
 
 ## Outcome semantics
 
@@ -167,6 +174,9 @@ Verdict artifacts include:
 - `warn` — non-blocking warnings were recorded
 - `blocked` — an effect or budget violation denied the run in-flight
 - `fail` — the run completed, but required checks or critical postconditions failed
+
+`pass` and `warn` require `final_gate: allowed`; `blocked` requires
+`final_gate: blocked`; `fail` requires `final_gate: failed`.
 
 ## Example coding-agent contract
 

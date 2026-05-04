@@ -212,6 +212,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** API quality, Stability, Security, Observability, Tests, Release & distribution
 
+**Status:** Complete (2026-05-04)
+
 **Estimate:** 2 cycles
 
 **Dependencies:** Task 4 should land first if verdict semantics change for `eval:` checks.
@@ -230,16 +232,26 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] Define a JSON Schema for verdict artifacts including `run_id`, `contract`, `host`, `outcome`, `final_gate`, `violations`, `checks`, `budgets`, `artifacts`, `timestamp`, and `warnings`.
-- [ ] Validate generated verdicts in tests.
-- [ ] Make `check-verdict` validate schema before evaluating outcome.
-- [ ] Add fixture tests for malformed JSON, missing fields, invalid outcomes, blocked/fail/warn/pass outcomes.
+- [x] Define a JSON Schema for verdict artifacts including `run_id`, `contract`, `host`, `outcome`, `final_gate`, `violations`, `checks`, `budgets`, `artifacts`, `timestamp`, and `warnings`.
+- [x] Validate generated verdicts in tests.
+- [x] Make `check-verdict` validate schema before evaluating outcome.
+- [x] Add fixture tests for malformed JSON, missing fields, invalid outcomes, blocked/fail/warn/pass outcomes.
 
 **Acceptance:**
 
 - `check-verdict` rejects malformed verdict artifacts with clear errors.
 - Generated `RunVerdict.to_dict()` output validates against the schema.
 - CI/action docs point to the schema-backed verdict contract.
+
+**Verification:**
+
+- Completed for Phase 3 Task 5.
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 211 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- CLI smoke checks passed: `validate AGENT_CONTRACT.yaml`, `validate examples/support_triage.yaml`, and `check-compat examples/support_triage.yaml examples/support_triage.yaml`.
+- Core `pip-audit`: no known vulnerabilities.
+- Optional extras `pip-audit`: no known vulnerabilities.
 
 **Risks/blockers:**
 
@@ -547,7 +559,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 | Fail-closed missing effect sub-surfaces | Task 3 | Complete |
 | `eval:` postconditions fake-green behavior | Task 4 | Complete |
 | Spec/package version mismatch | Task 6 | Planned, blocks release |
-| Verdict schema validation | Task 5 | Planned, blocks release |
+| Verdict schema validation | Task 5 | Complete |
 | Adapter verdict finalization | Task 7 | Planned, blocks release |
 | Docs/security/perf/release hygiene | Tasks 9-13 | Planned, blocks release |
 
@@ -592,4 +604,4 @@ Required evidence:
 
 ## Phase 3 Starting Point
 
-Task 4 is complete. Continue Phase 3 with Task 5: add verdict artifact schema validation.
+Task 5 is complete. Continue Phase 3 with Task 6: freeze spec/package version policy.

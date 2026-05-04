@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pyyush/agentcontracts/schemas/verdict.schema.json",
+  "title": "Agent Contracts Verdict Artifact",
+  "description": "Durable run verdict emitted by an Agent Contracts enforcer and consumed by CI gates.",
+  "type": "object",
+  "required": [
+    "run_id",
+    "contract",
+    "host",
+    "outcome",
+    "final_gate",
+    "violations",
+    "checks",
+    "budgets",
+    "artifacts",
+    "timestamp",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this governed run."
+    },
+    "contract": {
+      "$ref": "#/$defs/ContractRef"
+    },
+    "host": {
+      "$ref": "#/$defs/HostRef"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "warn",
+        "blocked",
+        "fail"
+      ]
+    },
+    "final_gate": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "blocked",
+        "failed"
+      ]
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Violation"
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Check"
+      }
+    },
+    "budgets": {
+      "$ref": "#/$defs/Budgets"
+    },
+    "artifacts": {
+      "$ref": "#/$defs/Artifacts"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "minLength": 1,
+      "description": "UTC timestamp for verdict finalization."
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "const": "blocked"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "final_gate": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "const": "fail"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "final_gate": {
+            "const": "failed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "enum": [
+              "pass",
+              "warn"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "final_gate": {
+            "const": "allowed"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "ContractRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "spec_version"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "HostRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Violation": {
+      "type": "object",
+      "required": [
+        "contract_id",
+        "contract_version",
+        "violated_clause",
+        "evidence",
+        "severity",
+        "enforcement",
+        "timestamp",
+        "event_id"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "violated_clause": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "major",
+            "minor"
+          ]
+        },
+        "enforcement": {
+          "type": "string",
+          "enum": [
+            "blocked",
+            "failed",
+            "warned",
+            "monitored"
+          ]
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "minLength": 1
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trace_id": {
+          "type": "string"
+        },
+        "span_id": {
+          "type": "string"
+        }
+      }
+    },
+    "Check": {
+      "type": "object",
+      "required": [
+        "name",
+        "status",
+        "required"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "warn",
+            "fail",
+            "blocked",
+            "skipped"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "Budgets": {
+      "type": "object",
+      "required": [
+        "cost_usd",
+        "tokens",
+        "tool_calls",
+        "shell_commands",
+        "duration_seconds"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "shell_commands": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "Artifacts": {
+      "type": "object",
+      "required": [
+        "verdict_path"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "verdict_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

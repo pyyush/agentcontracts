@@ -117,26 +117,44 @@ aicontracts validate AGENT_CONTRACT.yaml
 aicontracts check-verdict .agent-contracts/runs/<run-id>/verdict.json
 ```
 
-`check-verdict` exits non-zero on `blocked` or `fail`. Wire it into a required GitHub check and the merge cannot proceed without an honest contract pass.
+`check-verdict` validates the verdict schema first, then exits non-zero on `blocked` or `fail`. Wire it into a required GitHub check and the merge cannot proceed without an honest contract pass.
 
 ## Verdict artifacts
 
-Every meaningful run can emit one compact artifact, for example:
+Every meaningful run emits one schema-backed artifact. The public schema lives at `schemas/verdict.schema.json`, with the packaged runtime copy at `src/agent_contracts/schemas/verdict.schema.json`.
 
 ```json
 {
   "run_id": "...",
+  "contract": {
+    "name": "repo-build-agent",
+    "version": "0.1.0",
+    "spec_version": "0.1.0"
+  },
+  "host": {
+    "name": "claude-agent-sdk",
+    "version": "0.1.56"
+  },
   "outcome": "pass",
+  "final_gate": "allowed",
+  "violations": [],
   "checks": [
-    {"name": "pytest", "status": "pass", "exit_code": 0},
-    {"name": "ruff", "status": "pass", "exit_code": 0}
+    {"name": "pytest", "status": "pass", "required": true, "exit_code": 0},
+    {"name": "ruff", "status": "pass", "required": true, "exit_code": 0}
   ],
   "budgets": {
+    "cost_usd": 0.0,
     "tokens": 12345,
+    "tool_calls": 6,
     "shell_commands": 2,
     "duration_seconds": 18.2
   },
-  "violations": []
+  "artifacts": {
+    "verdict_path": ".agent-contracts/runs/<run-id>/verdict.json",
+    "contract_path": "AGENT_CONTRACT.yaml"
+  },
+  "timestamp": "2026-05-04T00:00:00+00:00",
+  "warnings": []
 }
 ```
 
@@ -206,7 +224,7 @@ The trade-off: legitimate piped commands like `cat file | head` cannot be expres
     verdict: .agent-contracts/runs/${{ github.run_id }}/verdict.json
 ```
 
-The action validates contracts and, when a verdict path is provided, fails the workflow for `blocked` or `fail` outcomes.
+The action validates contracts and, when a verdict path is provided, schema-validates the artifact before failing the workflow for `blocked` or `fail` outcomes.
 
 ## Canonical examples
 
@@ -220,7 +238,7 @@ The action validates contracts and, when a verdict path is provided, fails the w
 ## Project structure
 
 ```text
-schemas/                          JSON Schema for AGENT_CONTRACT.yaml
+schemas/                          JSON Schemas for AGENT_CONTRACT.yaml and verdict artifacts
 spec/SPECIFICATION.md             Human-readable specification
 src/agent_contracts/              Python SDK
   cli.py                          CLI entry point
