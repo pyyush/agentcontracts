@@ -1,10 +1,10 @@
-# Agent Contract Specification v0.1.0
+# Agent Contract Specification v1.0.0
 
 ## Overview
 
 An Agent Contract is a repo-local YAML document that declares what an autonomous coding/build agent may do, what it must prove before a run is considered successful, and where the final verdict artifact should be written.
 
-The v0.1.0 surface is intentionally narrow:
+The v1.0.0 surface is intentionally narrow:
 
 - authorize reads, writes, commands, tools, network, and state writes
 - enforce resource budgets
@@ -24,15 +24,19 @@ Contracts are YAML files, typically named `AGENT_CONTRACT.yaml`.
 Unknown fields are ignored for forward compatibility. Extension fields use the `x-` prefix.
 
 ```yaml
-agent_contract: "0.1.0"
+agent_contract: "1.0.0"
 identity:
   name: repo-build-agent
-  version: "0.1.0"
+  version: "1.0.0"
 contract:
   postconditions:
     - name: produces_output
       check: "output is not None"
 ```
+
+`agent_contract` is the contract specification version. It is intentionally
+separate from `identity.version`, which is the version of the agent described
+by the contract.
 
 ## Tiers
 
@@ -178,13 +182,43 @@ Verdict artifacts include:
 `pass` and `warn` require `final_gate: allowed`; `blocked` requires
 `final_gate: blocked`; `fail` requires `final_gate: failed`.
 
+## Version policy
+
+The `aicontracts` package version and the `agent_contract` spec version are
+related but distinct SemVer streams. For the planned stable release, package
+`1.0.0` implements contract spec `1.0.0` and the stable verdict artifact
+schema. Later package patch or minor releases may continue to implement
+contract spec `1.0.0`; the spec version changes only when the YAML contract or
+verdict artifact semantics change.
+
+New stable contracts should declare `agent_contract: "1.0.0"`. Runtimes should
+refuse contracts with a future incompatible major spec version rather than
+guessing at semantics.
+
+Stable SemVer surfaces:
+
+- **Python API:** public imports from `agent_contracts`, typed contract
+  objects, exceptions, and verdict helpers.
+- **CLI:** command names, option names, exit-code semantics, and JSON output
+  shapes.
+- **Contract schema:** required fields, allowed field meanings, and fail-closed
+  authorization semantics.
+- **Verdict schema:** required artifact fields, outcome/final-gate semantics,
+  and `check-verdict` gating behavior.
+- **GitHub Action:** input names, output names, outcome behavior, and the
+  package pin installed by each release tag.
+
+Major releases may make incompatible changes to those surfaces. Minor releases
+add backward-compatible capabilities. Patch releases fix bugs, security issues,
+and documentation without changing stable semantics.
+
 ## Example coding-agent contract
 
 ```yaml
-agent_contract: "0.1.0"
+agent_contract: "1.0.0"
 identity:
   name: repo-build-agent
-  version: "0.1.0"
+  version: "1.0.0"
 contract:
   postconditions:
     - name: repo_checks_green
@@ -209,11 +243,11 @@ observability:
 
 ## Compatibility notes
 
-Within v0.1.0:
+Within v1.0.0:
 
 - adding optional fields is backward-compatible
 - removing fields is breaking
 - changing field semantics is breaking
 - new required fields are breaking
 
-This repo intentionally does **not** use v0.1.0 to broaden into hosted policy platforms or generic agent governance.
+This repo intentionally does **not** use v1.0.0 to broaden into hosted policy platforms or generic agent governance.

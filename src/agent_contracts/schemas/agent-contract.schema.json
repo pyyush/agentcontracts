@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/pyyush/agentcontracts/schemas/agent-contract.schema.json",
-  "title": "Agent Contract",
-  "description": "YAML specification for enforceable agent behavioral contracts. Supports three graduated tiers: Standalone (Tier 0), Enforceable (Tier 1), and Composable (Tier 2).",
+  "title": "Agent Contract Schema 1.0.0",
+  "description": "YAML specification for enforceable agent behavioral contracts. Supports three graduated tiers: Standalone (Tier 0), Enforceable (Tier 1), and Composable (Tier 2). Package versions and contract spec versions are distinct SemVer streams; package 1.0.0 implements contract spec 1.0.0.",
   "type": "object",
   "required": [
     "agent_contract",
@@ -19,7 +19,7 @@
     "agent_contract": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+",
-      "description": "Spec version (semver). Enables forward compatibility via must-ignore semantics for unknown fields."
+      "description": "Contract spec version (semver). New stable contracts should use 1.0.0; this version is distinct from the package version and identity.version."
     },
     "identity": {
       "$ref": "#/$defs/Identity"

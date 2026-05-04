@@ -7,6 +7,8 @@
 
 Works with Claude Code, Codex, Cursor, and any agent runtime — the core is framework- and provider-agnostic. Optional thin adapters for Claude Agent SDK, OpenAI Agents SDK, and LangChain.
 
+> **Release status:** This branch is preparing `aicontracts 1.0.0` and contract spec `1.0.0`. PyPI currently publishes `aicontracts 0.2.0`; do not treat `1.0.0` as available until the PyPI package and `v1.0.0` GitHub tag are both published.
+
 ```bash
 pip install aicontracts
 aicontracts init --template coding -o AGENT_CONTRACT.yaml
@@ -49,10 +51,10 @@ aicontracts init --template coding -o AGENT_CONTRACT.yaml
 This drops a ready-to-use coding-agent contract in your repo:
 
 ```yaml
-agent_contract: "0.1.0"
+agent_contract: "1.0.0"
 identity:
   name: repo-build-agent
-  version: "0.1.0"
+  version: "1.0.0"
 
 effects:
   authorized:
@@ -128,8 +130,8 @@ Every meaningful run emits one schema-backed artifact. The public schema lives a
   "run_id": "...",
   "contract": {
     "name": "repo-build-agent",
-    "version": "0.1.0",
-    "spec_version": "0.1.0"
+    "version": "1.0.0",
+    "spec_version": "1.0.0"
   },
   "host": {
     "name": "claude-agent-sdk",
@@ -184,6 +186,22 @@ aicontracts check-compat producer.yaml consumer.yaml
 aicontracts check-verdict .agent-contracts/runs/<run-id>/verdict.json
 ```
 
+## Version policy
+
+`aicontracts` package versions and `agent_contract` spec versions are related but distinct SemVer streams. For the planned stable release, package `1.0.0` implements contract spec `1.0.0` and the stable verdict artifact schema. After that, package patch and minor releases may continue to implement contract spec `1.0.0`; the spec version changes only when the YAML contract or verdict artifact semantics change.
+
+New stable contracts should declare `agent_contract: "1.0.0"`. `identity.version` is the version of the agent described by the contract, so it can differ from both the package version and the spec version.
+
+SemVer stability covers:
+
+- **Python API:** public imports from `agent_contracts`, typed contract objects, exceptions, and verdict helpers.
+- **CLI:** command names, option names, exit-code semantics, and JSON output shapes.
+- **Contract schema:** required fields, allowed field meanings, and fail-closed authorization semantics.
+- **Verdict schema:** required artifact fields, outcome/final-gate semantics, and `check-verdict` gating behavior.
+- **GitHub Action:** input names, output names, outcome behavior, and the package pin installed by each release tag.
+
+Major releases may make incompatible changes to those surfaces. Minor releases add backward-compatible capabilities. Patch releases fix bugs, security issues, and documentation without changing stable semantics.
+
 ## Framework adapters (optional)
 
 The core (contract, CLI, verdict artifact, GitHub Action) is framework-agnostic and provider-agnostic. Adapters are optional ergonomic helpers that wire in-runtime hook calls into the same enforcer. Each is pinned to a specific SDK version and tested against the real SDK in CI.
@@ -198,13 +216,13 @@ All three SDK extras require Python 3.10+. The core package supports Python 3.9+
 
 In-runtime adapters add hard-stop coverage where the host exposes a pre-execution hook, but enforcement completeness still depends on the host's hook surface. The CI verdict gate is what makes enforcement total: every merge runs the same evaluator against the same contract, regardless of which framework, model, or runtime produced the run.
 
-### v0.3.0 roadmap
+### Post-1.0 roadmap
 
-A companion `@aicontracts/*` TypeScript package with adapters for Vercel AI SDK, Claude TypeScript SDK, and OpenAI Agents JS is planned for v0.3.0.
+A companion `@aicontracts/*` TypeScript package with adapters for Vercel AI SDK, Claude TypeScript SDK, and OpenAI Agents JS is planned after the stable Python release.
 
 ## Shell command matching: threat model
 
-Shell command authorization in v0.2.x is **strict reject + glob match**. Any command containing a shell metacharacter — `;` `&` `|` `<` `>` `` ` `` `$(` or a newline — is denied outright, even if its prefix matches an allowlisted pattern. This rules out command chaining, redirection, process substitution, and command injection at the contract layer.
+Shell command authorization is **strict reject + glob match**. Any command containing a shell metacharacter — `;` `&` `|` `<` `>` `` ` `` `$(` or a newline — is denied outright, even if its prefix matches an allowlisted pattern. This rules out command chaining, redirection, process substitution, and command injection at the contract layer.
 
 ```yaml
 shell:
@@ -213,16 +231,18 @@ shell:
                               # denied:  python -m pytest tests/ ; rm -rf /
 ```
 
-The trade-off: legitimate piped commands like `cat file | head` cannot be expressed as a single allowlist entry today. Wrap them in a script the contract authorizes by name, or split them into two records. v0.3.x will introduce a `shlex`-based token matcher that can express richer command shapes safely without weakening the fail-closed property.
+The trade-off: legitimate piped commands like `cat file | head` cannot be expressed as a single allowlist entry today. Wrap them in a script the contract authorizes by name, or split them into two records. A future minor release may introduce a `shlex`-based token matcher that can express richer command shapes safely without weakening the fail-closed property.
 
 ## GitHub Action
 
 ```yaml
-- uses: pyyush/agentcontracts@v0.2.0
+- uses: pyyush/agentcontracts@v1.0.0
   with:
     contract: AGENT_CONTRACT.yaml
     verdict: .agent-contracts/runs/${{ github.run_id }}/verdict.json
 ```
+
+Use immutable release tags for production workflows. The planned `v1.0.0` action tag installs `aicontracts==1.0.0`, so the GitHub tag must not be cut until the PyPI package is published. Before that release exists, keep production workflows pinned to the latest published 0.x action tag.
 
 The action validates contracts and, when a verdict path is provided, schema-validates the artifact before failing the workflow for `blocked` or `fail` outcomes.
 
@@ -262,7 +282,7 @@ A contract is a machine-enforceable artifact, not documentation. Markdown is pro
 - **Deterministic parse.** YAML has a JSON Schema (`schemas/agent-contract.schema.json`). Every runtime, in any language, produces the same parse tree from the same file. Markdown would require an LLM or a brittle regex extractor, and the verdict would depend on which extractor you used.
 - **Fail-closed needs typed fields.** `effects.authorized.filesystem.write: ["src/**"]` is a list of glob patterns. There is no ambiguity about whether `tests/secret.env` is in scope. A Markdown bullet under "## Files the agent can write" is interpretation, and interpretation is exactly what coding-agent guardrails cannot afford.
 - **Diff-friendly review.** YAML diffs per field. A reviewer can see "this PR added `python -m mypy *` to authorized shell commands" as a one-line change. Markdown prose diffs are noisy and merge conflicts on policy text are hard to reason about.
-- **Versioned schema.** `agent_contract: "0.1.0"` declares the spec version. Older runtimes can refuse contracts they don't understand; newer runtimes can ignore unknown fields under the `x-` prefix. Markdown has no equivalent.
+- **Versioned schema.** `agent_contract: "1.0.0"` declares the spec version. Older runtimes can refuse contracts they don't understand; newer runtimes can ignore unknown fields under the `x-` prefix. Markdown has no equivalent.
 - **Cloud-native muscle memory.** kubectl, GitHub Actions, OpenAPI, Helm, GitLab CI, ArgoCD — every fail-closed policy artifact in the ecosystem is YAML or JSON. Engineers already know how to author, lint, and review it.
 - **Still legible.** For the canonical coding-agent case (one identity block, one effects block, a few postconditions), the YAML is short enough to read without ceremony. The quick-start contract above fits on one screen.
 

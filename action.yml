@@ -45,7 +45,9 @@ runs:
 
     - name: Install aicontracts
       shell: bash
-      run: python -m pip install aicontracts==0.2.0
+      # Keep this PyPI pin aligned with the action release tag. Do not tag
+      # v1.0.0 until aicontracts==1.0.0 has been published.
+      run: python -m pip install aicontracts==1.0.0
 
     - name: Validate contract and verdict
       id: gate

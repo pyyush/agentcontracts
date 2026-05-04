@@ -1,10 +1,10 @@
 # Tier 2 — Composable Contract (retained broader example)
 
-agent_contract: "0.1.0"
+agent_contract: "1.0.0"
 
 identity:
   name: support-triage-agent
-  version: "0.1.0"
+  version: "1.0.0"
   description: Triages incoming support tickets with explicit safety and audit hooks.
   authors:
     - Piyush Vyas

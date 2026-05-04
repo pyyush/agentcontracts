@@ -261,6 +261,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** API quality, Docs, Release & distribution, Repo hygiene
 
+**Status:** Complete in Phase 3 Task 6.
+
 **Estimate:** 1 cycle
 
 **Dependencies:** Tasks 2-5 should be decided first because they affect public contract semantics.
@@ -279,9 +281,25 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] Decide whether contract spec version tracks package major/minor or evolves independently.
-- [ ] For `1.0.0`, make package version, README release references, action pin guidance, changelog, spec title, and examples consistent.
-- [ ] Document semver policy for Python API, CLI, contract schema, verdict schema, and action behavior.
+- [x] Decide whether contract spec version tracks package major/minor or evolves independently.
+- [x] For `1.0.0`, make package version, README release references, action pin guidance, changelog, spec title, and examples consistent.
+- [x] Document semver policy for Python API, CLI, contract schema, verdict schema, and action behavior.
+
+**Decision:**
+
+- Package versions and `agent_contract` spec versions are distinct SemVer streams.
+- For the planned stable release, `aicontracts 1.0.0` implements contract spec `1.0.0` and the stable verdict artifact schema.
+- Later package patch or minor releases may continue to implement contract spec `1.0.0`; the spec version changes only when YAML contract or verdict artifact semantics change.
+- `identity.version` remains the version of the agent described by the contract and can differ from both the package version and the spec version.
+
+**Verification:**
+
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 211 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- CLI smoke checks passed: `validate AGENT_CONTRACT.yaml`, `validate examples/support_triage.yaml`, and `check-compat examples/support_triage.yaml examples/support_triage.yaml`.
+- `python3 -m pip_audit . --progress-spinner off`: passed, no known vulnerabilities found.
+- `git diff --check`: passed.
 
 **Acceptance:**
 
@@ -291,7 +309,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Risks/blockers:**
 
-- Spec/package split may be valid, but ambiguity must be resolved before stable release.
+- No Task 6 blocker remains. `1.0.0` is prepared in source/docs but must not be described as published until both the PyPI package and `v1.0.0` GitHub tag exist.
 
 ### Task 7: Finalize Adapter Verdict Behavior
 
@@ -558,7 +576,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 | Filesystem path traversal canonicalization | Task 2 | Complete |
 | Fail-closed missing effect sub-surfaces | Task 3 | Complete |
 | `eval:` postconditions fake-green behavior | Task 4 | Complete |
-| Spec/package version mismatch | Task 6 | Planned, blocks release |
+| Spec/package version mismatch | Task 6 | Complete |
 | Verdict schema validation | Task 5 | Complete |
 | Adapter verdict finalization | Task 7 | Planned, blocks release |
 | Docs/security/perf/release hygiene | Tasks 9-13 | Planned, blocks release |
@@ -604,4 +622,4 @@ Required evidence:
 
 ## Phase 3 Starting Point
 
-Task 5 is complete. Continue Phase 3 with Task 6: freeze spec/package version policy.
+Task 6 is complete. Continue Phase 3 with Task 7: adapter verdict behavior.

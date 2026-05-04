@@ -4,9 +4,20 @@ All notable changes to this project are tracked here.
 
 ## Unreleased
 
+### Release target
+
+- preparing `aicontracts 1.0.0` and contract spec `1.0.0`; this is not published until both the PyPI package and the `v1.0.0` GitHub tag exist
+- aligned package source version, public examples, README release references, GitHub Action install pin, and spec text around the planned `1.0.0` stable release
+- documented that package versions and `agent_contract` spec versions are distinct SemVer streams after the initial stable alignment
+- documented SemVer stability policy for the Python API, CLI, contract schema, verdict schema, and GitHub Action behavior
+
 ### Added
 
 - added a JSON Schema for verdict artifacts and made `check-verdict` validate artifacts before outcome gating
+
+### Changed
+
+- changed canonical contracts and examples to declare `agent_contract: "1.0.0"` for the stable spec
 
 ### Security
 

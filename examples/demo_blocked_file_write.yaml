@@ -1,8 +1,8 @@
-agent_contract: "0.1.0"
+agent_contract: "1.0.0"
 
 identity:
   name: blocked-file-write-demo
-  version: "0.1.0"
+  version: "1.0.0"
 
 contract:
   postconditions:
