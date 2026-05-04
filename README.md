@@ -172,7 +172,7 @@ The core (contract, CLI, verdict artifact, GitHub Action) is framework-agnostic 
 |---|---|---|
 | Claude Agent SDK | `aicontracts[claude]` | `claude-agent-sdk==0.1.56` |
 | OpenAI Agents SDK | `aicontracts[openai]` | `openai-agents==0.13.5` |
-| LangChain | `aicontracts[langchain]` | `langchain-core==1.2.26` |
+| LangChain | `aicontracts[langchain]` | `langchain-core==1.2.28` |
 
 All three SDK extras require Python 3.10+. The core package supports Python 3.9+.
 

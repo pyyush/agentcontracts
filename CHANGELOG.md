@@ -2,6 +2,12 @@
 
 All notable changes to this project are tracked here.
 
+## Unreleased
+
+### Security
+
+- updated the optional LangChain adapter extra from `langchain-core==1.2.26` to `langchain-core==1.2.28`, which includes the fix for `CVE-2026-40087`
+
 ## [0.2.0] - 2026-04-06
 
 ### Added

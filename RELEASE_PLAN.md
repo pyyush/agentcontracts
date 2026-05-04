@@ -1,0 +1,561 @@
+# Agent Contracts 1.0 Release Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Ship `agent-contracts` as a stable, secure, valuable major release for repo-local fail-closed coding/build-agent guardrails.
+
+**Architecture:** Keep the project narrow: one repo-local YAML contract, one Python enforcement library, one CLI, one verdict artifact, one GitHub Action gate, and thin host adapters. The release sequence fixes security and fake-green failure modes first, then freezes public schemas/semantics, then hardens adapters, CI, docs, and release hygiene.
+
+**Tech Stack:** Python 3.9+ core package, Click CLI, PyYAML, jsonschema, pytest/coverage, ruff, mypy, pip-audit, GitHub Actions composite action, optional Claude/OpenAI/LangChain SDK adapters.
+
+---
+
+## Target Version
+
+Target release: `1.0.0`.
+
+Semver justification:
+
+- The current published package is `aicontracts 0.2.0` and is classified Alpha.
+- The mission is a stable major release with semver-stable public API, CLI behavior, contract schema, verdict schema, adapter semantics, and action behavior.
+- The required work changes or freezes user-facing semantics: fail-closed missing effect sub-surfaces, filesystem path authorization, `eval:` postconditions, verdict artifact validation, spec/package version policy, and adapter finalization. Those are major-release contract decisions.
+- If users need an urgent security patch before the major train completes, cut `0.2.1` for the vulnerable LangChain pin and filesystem traversal fix, but this plan's release target remains `1.0.0`.
+
+## Cycle Estimate Key
+
+One cycle means one focused implementation pass with tests and local verification by one engineer/agent, typically a half day to one day depending on review depth. Estimates include implementation, tests, and direct docs for the task, but not RC soak time.
+
+## Release Workstreams
+
+### Task 1: Patch Dependency Vulnerability
+
+**DoD:** Security, Release & distribution, Tests
+
+**Status:** Complete in Phase 3 Task 1.
+
+**Estimate:** 1 cycle
+
+**Dependencies:** None
+
+**Files likely touched in Phase 3:**
+
+- `pyproject.toml`
+- `README.md`
+- `CHANGELOG.md`
+- `.github/workflows/ci.yml`
+- tests under `tests/test_adapters/`
+
+**Plan:**
+
+- [x] Replace or remove the vulnerable `langchain-core==1.2.26` optional pin.
+- [x] Prefer a fixed compatible version if adapter tests pass; audit noted fixed versions `1.2.28` or `0.3.84`.
+- [x] Verify current PyPI availability before editing.
+- [x] Run adapter tests for LangChain on Python 3.10+.
+- [x] Run `pip-audit` against core plus optional extras.
+
+**Acceptance:**
+
+- `pip-audit` reports no known vulnerabilities for core and extras.
+- LangChain adapter tests pass against the selected pin.
+- README optional-extra table and changelog match the shipped pin.
+
+**Risks/blockers:**
+
+- Newer LangChain may break callback API compatibility.
+- If fixed LangChain versions are incompatible, temporarily remove or mark the LangChain extra unsupported until an adapter-compatible fixed version is found.
+
+### Task 2: Fix Filesystem Path Canonicalization
+
+**DoD:** Security, Stability, Tests, API quality
+
+**Estimate:** 2 cycles
+
+**Dependencies:** None
+
+**Files likely touched in Phase 3:**
+
+- `src/agent_contracts/effects.py`
+- `src/agent_contracts/enforcer.py`
+- `tests/test_effects.py`
+- `tests/test_enforcer.py`
+- `spec/SPECIFICATION.md`
+
+**Plan:**
+
+- [ ] Make filesystem authorization compare only canonical repo-relative paths plus clearly documented absolute paths inside the repo.
+- [ ] Reject or deny paths that resolve outside the repo root.
+- [ ] Add regression tests for `src/../.env`, absolute outside paths, symlink-like traversal cases where feasible, and normal allowed repo paths.
+- [ ] Keep glob semantics stable for legitimate `src/**`, `tests/**`, and exact-file patterns.
+
+**Acceptance:**
+
+- `src/../.env` does not match `src/**`.
+- Paths outside the repo root are denied when filesystem authorization is configured.
+- Existing canonical examples still validate and pass smoke tests.
+
+**Risks/blockers:**
+
+- Existing users may rely on raw-pattern matching for unusual paths. Document this as a security hardening change for `1.0.0`.
+
+### Task 3: Enforce Fail-Closed Missing Effect Sub-Surfaces
+
+**DoD:** Value, Security, Stability, API quality, Docs, Tests
+
+**Estimate:** 2 cycles
+
+**Dependencies:** Task 2 should land first so filesystem behavior is safe before tightening defaults.
+
+**Files likely touched in Phase 3:**
+
+- `src/agent_contracts/effects.py`
+- `src/agent_contracts/enforcer.py`
+- `src/agent_contracts/types.py`
+- `src/agent_contracts/loader.py`
+- `schemas/agent-contract.schema.json`
+- `src/agent_contracts/schemas/agent-contract.schema.json`
+- `tests/test_effects.py`
+- `tests/test_loader.py`
+- `tests/test_enforcer.py`
+- `README.md`
+- `spec/SPECIFICATION.md`
+- examples under `examples/`
+
+**Plan:**
+
+- [ ] Define `1.0.0` coding/build mode semantics: when `effects.authorized` is present, absent `tools`, `network`, `state_writes`, `filesystem`, and `shell` sub-surfaces are deny-by-default for their effect type.
+- [ ] Preserve backward compatibility only through explicit migration docs, not by keeping unsafe default-allow behavior.
+- [ ] Add tests that omit `filesystem` and `shell` and prove file/shell checks are denied.
+- [ ] Update examples to include intentional empty sub-surfaces where the user means "deny all".
+
+**Acceptance:**
+
+- Missing `filesystem` no longer allows arbitrary file reads/writes when effects authorization is configured.
+- Missing `shell` no longer allows arbitrary shell commands when effects authorization is configured.
+- Docs clearly distinguish "authorization absent entirely" from "authorization configured and sub-surface omitted".
+
+**Risks/blockers:**
+
+- This is a breaking semantic change for pre-1.0 users. It is acceptable for `1.0.0`, but must be prominent in migration notes.
+
+### Task 4: Eliminate `eval:` Fake-Green Postconditions
+
+**DoD:** Value, Stability, Security, API quality, Docs, Tests
+
+**Estimate:** 2 cycles
+
+**Dependencies:** None
+
+**Files likely touched in Phase 3:**
+
+- `src/agent_contracts/postconditions.py`
+- `src/agent_contracts/enforcer.py`
+- `src/agent_contracts/types.py`
+- `schemas/agent-contract.schema.json`
+- `src/agent_contracts/schemas/agent-contract.schema.json`
+- `tests/test_postconditions.py`
+- `tests/test_enforcer.py`
+- `README.md`
+- `spec/SPECIFICATION.md`
+
+**Plan:**
+
+- [ ] Replace automatic pass behavior for `eval:` checks with explicit unsupported, skipped, or adapter-required semantics.
+- [ ] Prefer fail-closed for `sync_block` `eval:` postconditions unless a concrete evaluator callback is supplied.
+- [ ] Add tests for `sync_block`, `sync_warn`, and `async_monitor` `eval:` checks.
+- [ ] Document the exact behavior and how future judge integrations should plug in.
+
+**Acceptance:**
+
+- A blocking `eval:` postcondition cannot produce a passing verdict without an evaluator.
+- Warnings and skipped states are visible in verdict artifacts where applicable.
+- README no longer implies LLM-as-judge checks work without integration.
+
+**Risks/blockers:**
+
+- Existing example or test expectations may assume placeholder pass behavior. Update them explicitly.
+
+### Task 5: Add Verdict Artifact Schema Validation
+
+**DoD:** API quality, Stability, Security, Observability, Tests, Release & distribution
+
+**Estimate:** 2 cycles
+
+**Dependencies:** Task 4 should land first if verdict semantics change for `eval:` checks.
+
+**Files likely touched in Phase 3:**
+
+- `schemas/verdict.schema.json`
+- `src/agent_contracts/schemas/verdict.schema.json`
+- `src/agent_contracts/schema.py`
+- `src/agent_contracts/enforcer.py`
+- `src/agent_contracts/cli.py`
+- `tests/test_enforcer.py`
+- `tests/test_cli.py`
+- `README.md`
+- `spec/SPECIFICATION.md`
+
+**Plan:**
+
+- [ ] Define a JSON Schema for verdict artifacts including `run_id`, `contract`, `host`, `outcome`, `final_gate`, `violations`, `checks`, `budgets`, `artifacts`, `timestamp`, and `warnings`.
+- [ ] Validate generated verdicts in tests.
+- [ ] Make `check-verdict` validate schema before evaluating outcome.
+- [ ] Add fixture tests for malformed JSON, missing fields, invalid outcomes, blocked/fail/warn/pass outcomes.
+
+**Acceptance:**
+
+- `check-verdict` rejects malformed verdict artifacts with clear errors.
+- Generated `RunVerdict.to_dict()` output validates against the schema.
+- CI/action docs point to the schema-backed verdict contract.
+
+**Risks/blockers:**
+
+- Strict schema may break existing user artifacts. Provide migration notes and keep optional fields optional where needed.
+
+### Task 6: Freeze Spec/Package Version Policy
+
+**DoD:** API quality, Docs, Release & distribution, Repo hygiene
+
+**Estimate:** 1 cycle
+
+**Dependencies:** Tasks 2-5 should be decided first because they affect public contract semantics.
+
+**Files likely touched in Phase 3:**
+
+- `src/agent_contracts/_version.py`
+- `schemas/agent-contract.schema.json`
+- `src/agent_contracts/schemas/agent-contract.schema.json`
+- `spec/SPECIFICATION.md`
+- `README.md`
+- `CHANGELOG.md`
+- `action.yml`
+- `AGENT_CONTRACT.yaml`
+- examples under `examples/`
+
+**Plan:**
+
+- [ ] Decide whether contract spec version tracks package major/minor or evolves independently.
+- [ ] For `1.0.0`, make package version, README release references, action pin guidance, changelog, spec title, and examples consistent.
+- [ ] Document semver policy for Python API, CLI, contract schema, verdict schema, and action behavior.
+
+**Acceptance:**
+
+- No public doc says `v0.1.0` unless it is historical.
+- Users can tell whether `agent_contract: "1.0.0"` is required, accepted, or distinct from package `1.0.0`.
+- Action examples use the intended release tag.
+
+**Risks/blockers:**
+
+- Spec/package split may be valid, but ambiguity must be resolved before stable release.
+
+### Task 7: Finalize Adapter Verdict Behavior
+
+**DoD:** Value, Stability, Observability, Docs, Tests
+
+**Estimate:** 3 cycles
+
+**Dependencies:** Task 5 should land first so adapters emit schema-valid artifacts.
+
+**Files likely touched in Phase 3:**
+
+- `src/agent_contracts/adapters/claude_agent.py`
+- `src/agent_contracts/adapters/openai_agents.py`
+- `src/agent_contracts/adapters/langchain.py`
+- tests under `tests/test_adapters/`
+- `README.md`
+- new docs under `docs/` if docs are allowed in Phase 3
+
+**Plan:**
+
+- [ ] For each adapter, define exactly when the run starts, when tool/file/shell/network effects are checkable, and when verdict finalization happens.
+- [ ] Add explicit finalization helpers if host hooks cannot guarantee finalization automatically.
+- [ ] Ensure adapter examples call finalization reliably.
+- [ ] Test pass, blocked, failed, and unexpected-error paths for each adapter where host SDK APIs allow.
+
+**Acceptance:**
+
+- Supported adapter paths can produce a schema-valid verdict artifact.
+- Adapter docs honestly state pre-execution versus post-decision limitations.
+- README's "every meaningful run can emit one artifact" claim matches behavior.
+
+**Risks/blockers:**
+
+- Some hosts may not expose pre-execution hooks for every effect type. Document and rely on CI verdict gating where hard stops are impossible.
+
+### Task 8: Harden CLI And GitHub Action Gate
+
+**DoD:** Value, Stability, Tests, Release & distribution, Observability
+
+**Estimate:** 2 cycles
+
+**Dependencies:** Task 5 must land first.
+
+**Files likely touched in Phase 3:**
+
+- `src/agent_contracts/cli.py`
+- `action.yml`
+- `.github/workflows/ci.yml`
+- `tests/test_cli.py`
+- possible action fixture workflow/tests
+- `README.md`
+
+**Plan:**
+
+- [ ] Add CLI tests for verdict validation errors and `--fail-on-warn`.
+- [ ] Add an action fixture or scripted smoke test that exercises `action.yml` behavior with pass/fail verdicts.
+- [ ] Confirm action install pin strategy for `1.0.0`.
+- [ ] Improve action output for multiple contract inputs if needed.
+
+**Acceptance:**
+
+- CLI and action gate blocked/fail/warn/pass outcomes consistently.
+- Action docs include `v1` or `v1.0.0` usage guidance.
+- CI runs an action smoke path or equivalent local composite-action validation.
+
+**Risks/blockers:**
+
+- Testing composite actions locally may require additional tooling. If so, create a minimal GitHub workflow fixture and document local limitations.
+
+### Task 9: Add Security And Release Hygiene
+
+**DoD:** Security, Repo hygiene, Release & distribution, Docs
+
+**Estimate:** 2 cycles
+
+**Dependencies:** Task 1 should land first.
+
+**Files likely touched in Phase 3:**
+
+- `SECURITY.md`
+- `CONTRIBUTING.md`
+- `CODEOWNERS`
+- `.github/dependabot.yml`
+- `.github/workflows/ci.yml`
+- `.github/workflows/publish.yml`
+- `README.md`
+- `CHANGELOG.md`
+
+**Plan:**
+
+- [ ] Add security reporting policy.
+- [ ] Add contributor setup and canonical commands.
+- [ ] Add ownership/review routing.
+- [ ] Add Dependabot or equivalent dependency update automation.
+- [ ] Add `pip-audit` gates for core and optional extras.
+- [ ] Make release hygiene checks explicit and remove implicit reliance on tools not installed by the workflow.
+
+**Acceptance:**
+
+- CI fails on known vulnerable dependencies.
+- External contributors can find setup, test, release, and security-reporting instructions.
+- Release workflow has no implicit dependency on unavailable command-line tools.
+
+**Risks/blockers:**
+
+- Some hygiene files are public docs and should avoid internal-only AGENTS/OMX details.
+
+### Task 10: Add Performance Baselines
+
+**DoD:** Performance, Tests, Stability, Docs
+
+**Estimate:** 2 cycles
+
+**Dependencies:** Tasks 2 and 4 should land first so benchmarks reflect final semantics.
+
+**Files likely touched in Phase 3:**
+
+- performance tests or benchmark files under `tests/` or `benchmarks/`
+- `src/agent_contracts/effects.py`
+- `src/agent_contracts/postconditions.py`
+- `src/agent_contracts/init_from_trace.py`
+- `README.md` or `spec/SPECIFICATION.md`
+
+**Plan:**
+
+- [ ] Add repeatable benchmarks for 1, 100, and 10,000 effect checks.
+- [ ] Add baseline for postcondition evaluation with small and large postcondition sets.
+- [ ] Add trace bootstrap benchmark for large JSONL traces.
+- [ ] Define acceptable thresholds and document them as release guardrails.
+
+**Acceptance:**
+
+- Release has concrete baseline numbers for hot paths.
+- Benchmarks are deterministic enough for local comparison even if not hard-gated in every CI run.
+- Any pattern caching or streaming optimization remains behavior-preserving.
+
+**Risks/blockers:**
+
+- Performance gates can be flaky in CI. Prefer benchmark reporting unless there is a stable threshold.
+
+### Task 11: Complete Docs And Demo Proof
+
+**DoD:** Value, Docs, Observability, Release & distribution
+
+**Estimate:** 3 cycles
+
+**Dependencies:** Tasks 2-8 should land first so docs match behavior.
+
+**Files likely touched in Phase 3:**
+
+- `README.md`
+- `spec/SPECIFICATION.md`
+- examples under `examples/`
+- new docs/demo files if docs are allowed in Phase 3
+- `CHANGELOG.md`
+
+**Plan:**
+
+- [ ] Add end-to-end demos for blocked file write, blocked shell command, failed checks, and green pass artifact.
+- [ ] Add host-specific integration docs for Claude Code, Codex, Claude Agent SDK, OpenAI Agents SDK, and LangChain.
+- [ ] Add sample verdict artifacts and CI annotations/PR-review guidance.
+- [ ] Update changelog with migration notes from `0.2.0` to `1.0.0`.
+
+**Acceptance:**
+
+- A skeptical repo owner can adopt the package from README plus examples.
+- Docs make host limitations clear and do not overclaim hard-stop coverage.
+- Demo artifacts validate against the verdict schema.
+
+**Risks/blockers:**
+
+- Docs may reveal that some host integrations are weaker than desired. Keep the CI verdict gate as source of truth.
+
+### Task 12: External User Validation
+
+**DoD:** Value, Stability, Docs, Release & distribution
+
+**Estimate:** 3 cycles plus calendar time
+
+**Dependencies:** Tasks 1-11 complete.
+
+**Files likely touched in Phase 3:**
+
+- `README.md`
+- examples/docs from Task 11
+- `CHANGELOG.md`
+- release checklist notes
+
+**Plan:**
+
+- [ ] Select at least two external or external-like repos: one Python repo and one JS/TS repo.
+- [ ] Install from the release candidate build.
+- [ ] Generate or adapt `AGENT_CONTRACT.yaml`.
+- [ ] Run local validate/check-verdict flow.
+- [ ] Add GitHub Action gate.
+- [ ] Record adoption friction and fix release-blocking issues.
+
+**Acceptance:**
+
+- At least two non-maintainer workflows can run the contract gate without hand editing internals.
+- External validation does not identify a P0/P1 blocker.
+- Any remaining friction is documented as non-blocking or tracked for post-1.0.
+
+**Risks/blockers:**
+
+- External validation requires calendar coordination and cannot be completed by implementation alone.
+
+### Task 13: Release Candidate And Final Release
+
+**DoD:** Release & distribution, Security, Tests, Docs, Repo hygiene
+
+**Estimate:** 2 cycles plus soak time
+
+**Dependencies:** Tasks 1-12 complete.
+
+**Files likely touched in Phase 3:**
+
+- `src/agent_contracts/_version.py`
+- `CHANGELOG.md`
+- `README.md`
+- `action.yml`
+- release workflow metadata as needed
+
+**Plan:**
+
+- [ ] Cut `1.0.0rc1` or equivalent pre-release artifact if PyPI flow supports it.
+- [ ] Run full local gates and GitHub matrix.
+- [ ] Run dependency audit gates.
+- [ ] Run action smoke gate.
+- [ ] Run external-user validation on RC.
+- [ ] Cut `v1.0.0` only after RC gates pass.
+
+**Acceptance:**
+
+- GitHub release and PyPI package are published for `1.0.0`.
+- GitHub Action usage is documented with a stable tag.
+- Changelog includes security, migration, and breaking-change notes.
+
+**Risks/blockers:**
+
+- RC gate must remain blocked until implementation and external validation are done.
+
+## Dependency Graph
+
+- Task 1 has no dependencies and should be first.
+- Task 2 has no dependencies and can run alongside Task 1.
+- Task 3 depends on Task 2.
+- Task 4 has no dependencies and can run alongside Task 1 or 2.
+- Task 5 depends on Task 4.
+- Task 6 depends on Tasks 2-5.
+- Task 7 depends on Task 5.
+- Task 8 depends on Task 5.
+- Task 9 depends on Task 1.
+- Task 10 depends on Tasks 2 and 4.
+- Task 11 depends on Tasks 2-8.
+- Task 12 depends on Tasks 1-11.
+- Task 13 depends on Tasks 1-12.
+
+## Audit Blocker Handling Matrix
+
+| Audit blocker | Handling task | Status |
+|---|---:|---|
+| Vulnerable optional `langchain-core==1.2.26` pin | Task 1 | Complete |
+| Filesystem path traversal canonicalization | Task 2 | Planned, blocks release |
+| Fail-closed missing effect sub-surfaces | Task 3 | Planned, blocks release |
+| `eval:` postconditions fake-green behavior | Task 4 | Planned, blocks release |
+| Spec/package version mismatch | Task 6 | Planned, blocks release |
+| Verdict schema validation | Task 5 | Planned, blocks release |
+| Adapter verdict finalization | Task 7 | Planned, blocks release |
+| Docs/security/perf/release hygiene | Tasks 9-13 | Planned, blocks release |
+
+## RC, External-User, And Release Gates
+
+### RC Gate
+
+Status: **BLOCKED until Tasks 1-11 are implemented.**
+
+Required evidence:
+
+- Full local canonical gates pass.
+- GitHub CI matrix passes on Python 3.9, 3.10, 3.11, 3.12, 3.13.
+- Core and optional extras dependency audits pass.
+- Verdict schema tests pass.
+- GitHub Action smoke gate passes.
+- Changelog and migration notes are complete.
+
+### External-User Gate
+
+Status: **BLOCKED until RC artifact and demo docs exist.**
+
+Required evidence:
+
+- At least two external or external-like repositories install the RC.
+- Both produce a valid `AGENT_CONTRACT.yaml`.
+- Both run `validate` and `check-verdict`.
+- At least one uses the GitHub Action gate.
+- No P0/P1 adoption blocker remains open.
+
+### Final Release Gate
+
+Status: **BLOCKED until RC and external-user gates pass.**
+
+Required evidence:
+
+- `1.0.0` version/tag/package/action/docs are consistent.
+- PyPI wheel and sdist are built and checked.
+- GitHub release notes include breaking changes and security notes.
+- Public docs do not overclaim adapter enforcement coverage.
+- Release owner signs off on DoD sections: Value, API quality, Stability, Tests, Security, Performance, Docs, Release & distribution, Repo hygiene, Observability.
+
+## Phase 3 Starting Point
+
+Task 1 is complete. Continue Phase 3 with Task 2: fix filesystem path canonicalization.
