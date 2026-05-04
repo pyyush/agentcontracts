@@ -8,6 +8,7 @@ All notable changes to this project are tracked here.
 
 - updated the optional LangChain adapter extra from `langchain-core==1.2.26` to `langchain-core==1.2.28`, which includes the fix for `CVE-2026-40087`
 - changed configured effect authorization to fail closed for omitted `filesystem` and `shell` sub-surfaces; once `effects.authorized` is present, omitted file or shell authorization denies those effects by default
+- changed `eval:` postconditions to stop auto-passing without evaluator integration; blocking eval checks fail closed, while warning and async eval checks emit visible warnings
 
 ## [0.2.0] - 2026-04-06
 

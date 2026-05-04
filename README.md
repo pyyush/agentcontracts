@@ -85,6 +85,8 @@ contract:
 
 When `effects.authorized` is present, every effect sub-surface is fail-closed. Empty `tools`, `network`, and `state_writes` lists mean the agent cannot use any tool, hit any network endpoint, or write to tracked state unless you list it. Omitted or empty `filesystem` and `shell` sub-surfaces deny file and shell effects by default. Leaving `effects.authorized` out entirely is the explicit unconfigured mode for compatibility and does not enforce effect gates.
 
+Postconditions are deterministic by default. `eval:*` checks are external evaluator hooks, not built-in LLM judges; without an evaluator integration, `sync_block` eval checks fail closed and `sync_warn` or `async_monitor` eval checks emit visible warnings instead of passing.
+
 ### 2. Hook it into your agent runtime
 
 The Claude Agent SDK adapter forwards every tool call into the enforcer — no manual instrumentation:

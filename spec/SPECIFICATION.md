@@ -135,6 +135,11 @@ Supported expression forms include:
 - `len(output.items) > 0`
 - `checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0`
 
+`eval:*` postconditions are external evaluator hooks, not built-in LLM-as-judge checks.
+If no evaluator integration is supplied, `sync_block` eval checks fail closed, while
+`sync_warn` and `async_monitor` eval checks record visible warnings and do not count as
+passing checks.
+
 ## Observability and verdict artifacts
 
 ```yaml

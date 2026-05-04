@@ -128,6 +128,78 @@ class TestContractEnforcer:
         assert verdict.final_gate == "failed"
         assert any(v["violated_clause"] == "contract.postconditions.repo_checks_green" for v in verdict.violations)
 
+    def test_eval_sync_block_without_evaluator_fails_verdict(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        coding_contract_data["contract"]["postconditions"] = [
+            {
+                "name": "quality_judge",
+                "check": "eval:quality_judge",
+                "enforcement": "sync_block",
+                "severity": "critical",
+            }
+        ]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        verdict = enforcer.finalize_run(output={"status": "done"})
+
+        assert verdict.outcome == "fail"
+        assert verdict.final_gate == "failed"
+        assert any(
+            v["violated_clause"] == "contract.postconditions.quality_judge"
+            and v["evidence"]["check"] == "eval:quality_judge"
+            for v in verdict.violations
+        )
+
+    def test_eval_sync_warn_without_evaluator_warns_verdict(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        coding_contract_data["contract"]["postconditions"] = [
+            {
+                "name": "quality_judge",
+                "check": "eval:quality_judge",
+                "enforcement": "sync_warn",
+                "severity": "major",
+            }
+        ]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        verdict = enforcer.finalize_run(output={"status": "done"})
+
+        assert verdict.outcome == "warn"
+        assert any("quality_judge" in warning for warning in verdict.warnings)
+        assert any(
+            v["violated_clause"] == "contract.postconditions.quality_judge"
+            and v["enforcement"] == "warned"
+            for v in verdict.violations
+        )
+
+    def test_eval_async_monitor_without_evaluator_warns_verdict(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        coding_contract_data["contract"]["postconditions"] = [
+            {
+                "name": "quality_judge",
+                "check": "eval:quality_judge",
+                "enforcement": "async_monitor",
+                "severity": "minor",
+            }
+        ]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        verdict = enforcer.finalize_run(output={"status": "done"})
+
+        assert verdict.outcome == "warn"
+        assert any("quality_judge" in warning for warning in verdict.warnings)
+        assert any(
+            v["violated_clause"] == "contract.postconditions.quality_judge"
+            and v["enforcement"] == "warned"
+            for v in verdict.violations
+        )
+
     def test_pass_verdict_writes_artifact(self, tmp_yaml, coding_contract_data, tmp_path: Path) -> None:
         contract = load_contract(tmp_yaml(coding_contract_data))
         enforcer = ContractEnforcer(contract, repo_root=tmp_path)

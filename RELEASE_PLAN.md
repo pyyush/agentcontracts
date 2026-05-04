@@ -165,6 +165,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Estimate:** 2 cycles
 
+**Status:** Complete
+
 **Dependencies:** None
 
 **Files likely touched in Phase 3:**
@@ -178,13 +180,14 @@ One cycle means one focused implementation pass with tests and local verificatio
 - `tests/test_enforcer.py`
 - `README.md`
 - `spec/SPECIFICATION.md`
+- `CHANGELOG.md`
 
 **Plan:**
 
-- [ ] Replace automatic pass behavior for `eval:` checks with explicit unsupported, skipped, or adapter-required semantics.
-- [ ] Prefer fail-closed for `sync_block` `eval:` postconditions unless a concrete evaluator callback is supplied.
-- [ ] Add tests for `sync_block`, `sync_warn`, and `async_monitor` `eval:` checks.
-- [ ] Document the exact behavior and how future judge integrations should plug in.
+- [x] Replace automatic pass behavior for `eval:` checks with explicit unsupported, skipped, or adapter-required semantics.
+- [x] Prefer fail-closed for `sync_block` `eval:` postconditions unless a concrete evaluator callback is supplied.
+- [x] Add tests for `sync_block`, `sync_warn`, and `async_monitor` `eval:` checks.
+- [x] Document the exact behavior and how future judge integrations should plug in.
 
 **Acceptance:**
 
@@ -192,9 +195,18 @@ One cycle means one focused implementation pass with tests and local verificatio
 - Warnings and skipped states are visible in verdict artifacts where applicable.
 - README no longer implies LLM-as-judge checks work without integration.
 
+**Verification:**
+
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 203 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- CLI smoke checks for `AGENT_CONTRACT.yaml`, `examples/support_triage.yaml`, and `check-compat examples/support_triage.yaml examples/support_triage.yaml`: passed.
+- Core `pip-audit`: no known vulnerabilities found.
+- Optional extras `pip-audit` with `langchain-core==1.2.28`, `openai-agents==0.13.5`, and `claude-agent-sdk==0.1.56`: no known vulnerabilities found.
+
 **Risks/blockers:**
 
-- Existing example or test expectations may assume placeholder pass behavior. Update them explicitly.
+- This is a breaking semantic change for any pre-1.0 contract that relied on placeholder `eval:` checks passing. It must remain prominent in migration notes.
 
 ### Task 5: Add Verdict Artifact Schema Validation
 
@@ -533,7 +545,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 | Vulnerable optional `langchain-core==1.2.26` pin | Task 1 | Complete |
 | Filesystem path traversal canonicalization | Task 2 | Complete |
 | Fail-closed missing effect sub-surfaces | Task 3 | Complete |
-| `eval:` postconditions fake-green behavior | Task 4 | Planned, blocks release |
+| `eval:` postconditions fake-green behavior | Task 4 | Complete |
 | Spec/package version mismatch | Task 6 | Planned, blocks release |
 | Verdict schema validation | Task 5 | Planned, blocks release |
 | Adapter verdict finalization | Task 7 | Planned, blocks release |
@@ -580,4 +592,4 @@ Required evidence:
 
 ## Phase 3 Starting Point
 
-Task 3 is complete. Continue Phase 3 with Task 4: eliminate `eval:` postcondition fake-green behavior.
+Task 4 is complete. Continue Phase 3 with Task 5: add verdict artifact schema validation.

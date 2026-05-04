@@ -120,7 +120,7 @@
         "check": {
           "type": "string",
           "minLength": 1,
-          "description": "Expression to evaluate. Supports CEL-like syntax (e.g., 'output.status in [\"resolved\", \"escalated\"]') or 'eval:judge' for LLM-as-judge."
+          "description": "Expression to evaluate. Supports deterministic CEL-like syntax (e.g., 'output.status in [\"resolved\", \"escalated\"]'). 'eval:judge' names an external evaluator hook; without integration it is unsupported (sync_block fails, sync_warn/async_monitor warn)."
         },
         "enforcement": {
           "type": "string",
