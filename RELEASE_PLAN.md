@@ -368,6 +368,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **DoD:** Value, Stability, Tests, Release & distribution, Observability
 
+**Status:** Complete in Phase 3 Task 8.
+
 **Estimate:** 2 cycles
 
 **Dependencies:** Task 5 must land first.
@@ -383,10 +385,29 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Plan:**
 
-- [ ] Add CLI tests for verdict validation errors and `--fail-on-warn`.
-- [ ] Add an action fixture or scripted smoke test that exercises `action.yml` behavior with pass/fail verdicts.
-- [ ] Confirm action install pin strategy for `1.0.0`.
-- [ ] Improve action output for multiple contract inputs if needed.
+- [x] Add CLI tests for verdict validation errors and `--fail-on-warn`.
+- [x] Add an action fixture or scripted smoke test that exercises `action.yml` behavior with pass/fail verdicts.
+- [x] Confirm action install pin strategy for `1.0.0`.
+- [x] Improve action output for multiple contract inputs if needed.
+
+**Results:**
+
+- Retained the existing `tests/test_cli.py` additions for verdict schema failures and `--fail-on-warn`; they passed unchanged and already cover the CLI half of this task.
+- Added a lightweight local smoke test in `tests/test_action_yml.py` that parses `action.yml` and asserts the critical shell semantics are present: pinned `aicontracts==1.0.0` install, `fail-on-warning` handling, `fail-on-warn-outcome` mapping to `--fail-on-warn`, `check-verdict` invocation, and fail-closed exit behavior.
+- Verified the release-pin guidance against live PyPI state: `aicontracts 0.2.0` is still the latest published version, so the existing README and action comments about not cutting `v1.0.0` before publishing `aicontracts==1.0.0` remain accurate. No README wording change was required.
+- Reviewed multi-contract action output behavior and left it unchanged for `1.0.0`; the current grouped validation logs plus final outputs are acceptable for this release slice.
+
+**Verification:**
+
+- `python3 -m ruff check src/ tests/`: passed.
+- `python3 -m pytest --cov=agent_contracts --cov-report=term-missing`: passed, 234 passed, 6 skipped, 91% coverage.
+- `python3 -m mypy src/agent_contracts`: passed.
+- `python3 -m agent_contracts.cli validate AGENT_CONTRACT.yaml`: passed.
+- `python3 -m agent_contracts.cli validate examples/support_triage.yaml`: passed.
+- `python3 -m agent_contracts.cli check-compat examples/support_triage.yaml examples/support_triage.yaml`: passed.
+- `python3 -m pytest tests/test_action_yml.py -q`: passed, 3 tests.
+- `python3 -m pip_audit . --progress-spinner off`: passed, no known vulnerabilities found.
+- `git diff --check`: passed.
 
 **Acceptance:**
 
@@ -396,7 +417,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Risks/blockers:**
 
-- Testing composite actions locally may require additional tooling. If so, create a minimal GitHub workflow fixture and document local limitations.
+- No Task 8 blocker remains. Local coverage uses a Python smoke test that inspects composite-action shell semantics instead of invoking a GitHub-hosted runner or Docker, which is sufficient for this release slice and keeps the test portable.
 
 ### Task 9: Add Security And Release Hygiene
 

@@ -161,6 +161,26 @@ class TestCheckVerdict:
         assert result.exit_code == 0
         assert "Outcome: warn" in result.output
 
+    def test_warn_fail_on_warn(
+        self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]
+    ) -> None:
+        verdict_payload["outcome"] = "warn"
+        verdict = _write_verdict(tmp_path, verdict_payload)
+        result = runner.invoke(main, ["check-verdict", str(verdict), "--fail-on-warn"])
+        assert result.exit_code == 1
+        assert "Outcome: warn" in result.output
+
+    def test_warn_json_fail_on_warn(
+        self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]
+    ) -> None:
+        verdict_payload["outcome"] = "warn"
+        verdict = _write_verdict(tmp_path, verdict_payload)
+        result = runner.invoke(
+            main, ["check-verdict", str(verdict), "--json-output", "--fail-on-warn"]
+        )
+        assert result.exit_code == 1
+        assert json.loads(result.output)["outcome"] == "warn"
+
     def test_blocked(self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]) -> None:
         verdict_payload["outcome"] = "blocked"
         verdict_payload["final_gate"] = "blocked"
@@ -189,6 +209,14 @@ class TestCheckVerdict:
         assert result.exit_code == 1
         assert "Verdict schema error" in result.output
         assert "run_id" in result.output
+
+    def test_missing_required_fields_json_output(self, runner: CliRunner, tmp_path: Path) -> None:
+        verdict = _write_verdict(tmp_path, {"outcome": "pass", "final_gate": "allowed"})
+        result = runner.invoke(main, ["check-verdict", str(verdict), "--json-output"])
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["valid"] is False
+        assert any("run_id" in error for error in payload["errors"])
 
     def test_invalid_outcome(self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]) -> None:
         verdict_payload["outcome"] = "green"
