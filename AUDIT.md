@@ -407,4 +407,3 @@ Repo hygiene:
 Observability:
 
 - Delta: formalize verdict schema, provide artifact examples, and ensure every supported runtime path writes a verdict.
-

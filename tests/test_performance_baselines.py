@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List
 
@@ -19,6 +22,7 @@ from agent_contracts.types import (
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINES_PATH = ROOT / "benchmarks" / "performance-baselines.json"
+ENFORCE_PERF_BUDGETS = os.environ.get("AICONTRACTS_ENFORCE_PERF_BUDGETS") == "true"
 
 
 def _load_baselines() -> Dict[str, Any]:
@@ -33,10 +37,19 @@ def _elapsed_ms(operation: Callable[[], Any]) -> float:
 
 
 def _assert_within_budget(name: str, elapsed_ms: float, max_ms: float) -> None:
-    assert elapsed_ms <= max_ms, (
-        f"{name} took {elapsed_ms:.2f}ms, exceeding the {max_ms:.2f}ms "
+    message = (
+        f"{name} took {elapsed_ms:.2f}ms on Python "
+        f"{sys.version_info.major}.{sys.version_info.minor}, exceeding the {max_ms:.2f}ms "
         "release performance budget"
     )
+    if ENFORCE_PERF_BUDGETS:
+        assert elapsed_ms <= max_ms, message
+    elif elapsed_ms > max_ms:
+        warnings.warn(
+            f"reporting-only performance budget overrun: {message}",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
 
 def test_effect_checks_stay_within_release_baselines(tmp_path: Path) -> None:

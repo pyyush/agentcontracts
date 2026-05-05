@@ -251,8 +251,11 @@ The `1.0.0` release tracks concrete budgets for the hot paths that decide
 whether a governed run can finish: effect authorization, postcondition
 evaluation, and trace-to-contract bootstrap. The baseline artifact lives at
 `benchmarks/performance-baselines.json`, the release notes for the budgets
-live in `benchmarks/README.md`, and the budgets are enforced by
-`tests/test_performance_baselines.py` as part of the standard pytest suite.
+live in `benchmarks/README.md`, and `tests/test_performance_baselines.py`
+runs as part of the standard pytest suite. CI hard-enforces those wall-clock
+budgets on Python 3.11 as the representative interpreter and runs the same
+benchmark shapes as reporting checks on the rest of the advertised Python
+matrix, including Python 3.9.
 
 Current release budgets are intentionally conservative: 10,000 mixed effect
 checks must complete within 1.5 seconds, 1,000 postconditions within 300 ms,
@@ -311,7 +314,11 @@ The trade-off: legitimate piped commands like `cat file | head` cannot be expres
     verdict: .agent-contracts/runs/${{ github.run_id }}/verdict.json
 ```
 
-Use immutable release tags for production workflows. The planned `v1.0.0` action tag installs `aicontracts==1.0.0`, so the GitHub tag must not be cut until the PyPI package is published. Before that release exists, keep production workflows pinned to the latest published 0.x action tag.
+Use immutable release tags for production workflows. Until `aicontracts==1.0.0`
+exists on PyPI, the action default remains pinned to the latest published
+package, currently `aicontracts==0.2.0`. The release-day path is to publish the
+stable PyPI package first, then cut the `v1.0.0` action tag from a commit whose
+default `package-spec` is `aicontracts==1.0.0`.
 
 For release-candidate validation only, keep the action ref pinned to the RC tag
 and override `package-spec` so the action installs the exact RC package being
@@ -327,7 +334,7 @@ validated:
 ```
 
 Production workflows should not override `package-spec` after `v1.0.0` exists;
-the default remains the stable final `aicontracts==1.0.0` pin.
+the release tag default should be the stable final `aicontracts==1.0.0` pin.
 
 The action validates contracts and, when a verdict path is provided, schema-validates the artifact before failing the workflow for `blocked` or `fail` outcomes.
 

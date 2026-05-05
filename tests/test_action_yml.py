@@ -20,7 +20,7 @@ def _step_with_name(action_definition: dict[str, Any], name: str) -> dict[str, A
     return next(step for step in action_definition["runs"]["steps"] if step.get("name") == name)
 
 
-def test_action_defaults_to_final_pin_and_supports_rc_install_override(
+def test_action_defaults_to_published_pin_and_supports_release_install_override(
     action_definition: dict[str, Any]
 ) -> None:
     inputs = action_definition["inputs"]
@@ -28,7 +28,7 @@ def test_action_defaults_to_final_pin_and_supports_rc_install_override(
     install_script = install_step["run"]
 
     assert install_step["shell"] == "bash"
-    assert inputs["package-spec"]["default"] == "aicontracts==1.0.0"
+    assert inputs["package-spec"]["default"] == "aicontracts==0.2.0"
     assert inputs["allow-prerelease"]["default"] == "false"
     assert inputs["pip-index-url"]["default"] == ""
     assert inputs["pip-extra-index-url"]["default"] == ""

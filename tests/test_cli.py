@@ -112,14 +112,20 @@ class TestInit:
     def test_template_generation(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["init", "--name", "test-agent"])
         assert result.exit_code == 0
-        assert "test-agent" in result.output
-        assert "postconditions" in result.output
+        parsed = yaml.safe_load(result.output)
+        assert parsed["agent_contract"] == "1.0.0"
+        assert parsed["identity"]["name"] == "test-agent"
+        assert parsed["identity"]["version"] == "1.0.0"
+        assert "postconditions" in parsed["contract"]
 
     def test_coding_template_generation(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["init", "--template", "coding"])
         assert result.exit_code == 0
-        assert "filesystem:" in result.output
-        assert "run_artifact_path" in result.output
+        parsed = yaml.safe_load(result.output)
+        assert parsed["agent_contract"] == "1.0.0"
+        assert parsed["identity"]["version"] == "1.0.0"
+        assert "filesystem" in parsed["effects"]["authorized"]
+        assert "run_artifact_path" in parsed["observability"]
 
     def test_output_to_file(self, runner: CliRunner, tmp_path: Path) -> None:
         out = tmp_path / "generated.yaml"
@@ -142,9 +148,11 @@ class TestInit:
         trace_file.write_text("\n".join(json.dumps(t) for t in traces), encoding="utf-8")
         result = runner.invoke(main, ["init", "--from-trace", str(trace_file)])
         assert result.exit_code == 0
-        assert "trace-agent" in result.output
-        assert "filesystem" in result.output
-        assert "shell" in result.output
+        parsed = yaml.safe_load(result.output)
+        assert parsed["agent_contract"] == "1.0.0"
+        assert parsed["identity"] == {"name": "trace-agent", "version": "1.0.0"}
+        assert "filesystem" in parsed["effects"]["authorized"]
+        assert "shell" in parsed["effects"]["authorized"]
 
 
 class TestCheckVerdict:

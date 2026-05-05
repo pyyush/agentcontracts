@@ -69,7 +69,8 @@ class TestGenerateFromTraces:
     def test_yaml_output(self, tmp_path: Path) -> None:
         traces = [{"tool_calls": [{"name": "search"}], "usage": {"cost_usd": 0.01, "total_tokens": 100}}]
         parsed = yaml.safe_load(generate_contract_yaml(self._write_traces(tmp_path, traces)))
-        assert parsed["agent_contract"] == "0.1.0"
+        assert parsed["agent_contract"] == "1.0.0"
+        assert parsed["identity"]["version"] == "1.0.0"
         assert parsed["observability"]["run_artifact_path"] == ".agent-contracts/runs/{run_id}/verdict.json"
 
     def test_empty_traces(self, tmp_path: Path) -> None:

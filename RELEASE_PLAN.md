@@ -393,8 +393,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 **Results:**
 
 - Retained the existing `tests/test_cli.py` additions for verdict schema failures and `--fail-on-warn`; they passed unchanged and already cover the CLI half of this task.
-- Added a lightweight local smoke test in `tests/test_action_yml.py` that parses `action.yml` and asserts the critical shell semantics are present: default `aicontracts==1.0.0` install, RC-safe package override inputs, `fail-on-warning` handling, `fail-on-warn-outcome` mapping to `--fail-on-warn`, `check-verdict` invocation, and fail-closed exit behavior.
-- Verified the release-pin guidance against live PyPI state: `aicontracts 0.2.0` is still the latest published version, so the existing README and action comments about not cutting `v1.0.0` before publishing `aicontracts==1.0.0` remain accurate. No README wording change was required.
+- Added a lightweight local smoke test in `tests/test_action_yml.py` that parses `action.yml` and asserts the critical shell semantics are present: default published-package install, RC-safe package override inputs, `fail-on-warning` handling, `fail-on-warn-outcome` mapping to `--fail-on-warn`, `check-verdict` invocation, and fail-closed exit behavior.
+- Verified the release-pin guidance against live PyPI state: `aicontracts 0.2.0` is still the latest published version, so `action.yml` must not default to unpublished `aicontracts==1.0.0` on `main`. The release-day path is to publish the PyPI package first, then cut `v1.0.0` from a commit whose default `package-spec` is `aicontracts==1.0.0`.
 - Reviewed multi-contract action output behavior and left it unchanged for `1.0.0`; the current grouped validation logs plus final outputs are acceptable for this release slice.
 
 **Verification:**
@@ -504,7 +504,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 **Results:**
 
 - Added `benchmarks/performance-baselines.json` with concrete local baselines and conservative release budgets for effect authorization, postcondition evaluation, and JSONL trace bootstrap.
-- Added `tests/test_performance_baselines.py`, which runs in the normal pytest suite and enforces the release budgets.
+- Added `tests/test_performance_baselines.py`, which runs in the normal pytest suite. CI hard-enforces the release budgets on Python 3.11 as the representative interpreter and runs the same benchmark shapes as reporting checks on the rest of the advertised Python matrix.
 - Documented the release guardrails in `benchmarks/README.md` and summarized the enforced budgets in `README.md`.
 - Local baseline medians on May 4, 2026: 1 effect check 0.004 ms, 100 effect checks 2.47 ms, 10,000 effect checks 200.45 ms, 5 postconditions 0.10 ms, 1,000 postconditions 19.31 ms, and 2,500 JSONL trace bootstrap 28.24 ms.
 
@@ -626,7 +626,7 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 - External validation requires calendar coordination and cannot be completed by implementation alone.
 - No RC artifact, package URL, tag, checksums, external validator, or GitHub Action validation URL exists yet.
-- The action now supports RC package installation through `package-spec`; a real RC validation run must set that input to the matching RC artifact instead of relying on the final default `aicontracts==1.0.0` pin.
+- The action now supports RC package installation through `package-spec`; a real RC validation run must set that input to the matching RC artifact instead of relying on the temporary main default pin to the latest published 0.x package.
 - Task 12 must stay open until a real external developer runs the RC in their own project and the feedback is incorporated or explicitly deferred.
 
 **Task 12 preparation verification:** Completed for the RC validation handoff.
@@ -661,7 +661,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 **Plan:**
 
 - [ ] Cut `1.0.0rc1` or equivalent pre-release artifact if PyPI flow supports it.
-- [x] Prepare the GitHub Action install path so RC validators can install the matching RC artifact without weakening the stable `v1.0.0` default.
+- [x] Prepare the GitHub Action install path so RC validators can install the matching RC artifact without pointing `main` at unpublished `aicontracts==1.0.0`.
+- [ ] After publishing `aicontracts==1.0.0`, switch `action.yml` default `package-spec` to `aicontracts==1.0.0` before cutting the `v1.0.0` action tag.
 - [x] Update package metadata for the stable release train.
 - [ ] Run full local gates and GitHub matrix.
 - [ ] Run dependency audit gates.
@@ -684,8 +685,8 @@ One cycle means one focused implementation pass with tests and local verificatio
 
 **Task 13 preparation verification:** Completed for local pre-RC self-blockers.
 
-- `action.yml` defaults to `package-spec: aicontracts==1.0.0` for final release tags and supports RC validation through `package-spec`, `allow-prerelease`, `pip-index-url`, and `pip-extra-index-url`.
-- `tests/test_action_yml.py` verifies the stable default pin, RC install override inputs, guarded prerelease flag handling, package-spec non-empty check, and fail-closed verdict gate semantics.
+- `action.yml` defaults to `package-spec: aicontracts==0.2.0` while `aicontracts==1.0.0` is unpublished, and supports RC/final validation through `package-spec`, `allow-prerelease`, `pip-index-url`, and `pip-extra-index-url`.
+- `tests/test_action_yml.py` verifies the safe published default pin, RC/final install override inputs, guarded prerelease flag handling, package-spec non-empty check, and fail-closed verdict gate semantics.
 - `.github/workflows/publish.yml` marks PEP 440 prerelease tags (`a`, `b`, `rc`, `.dev`) as GitHub prereleases, keeping RC GitHub releases distinct from final stable releases.
 - `tests/test_release_workflow.py` verifies the release workflow prerelease detection and `softprops/action-gh-release` wiring.
 - `pyproject.toml` now uses `Development Status :: 5 - Production/Stable` for the planned stable package metadata.

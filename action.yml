@@ -27,7 +27,7 @@ inputs:
   package-spec:
     description: 'Package requirement, wheel URL, or local wheel path to install'
     required: false
-    default: 'aicontracts==1.0.0'
+    default: 'aicontracts==0.2.0'
   allow-prerelease:
     description: 'Pass --pre to pip when installing package-spec'
     required: false
@@ -66,9 +66,9 @@ runs:
         AICONTRACTS_ALLOW_PRERELEASE: ${{ inputs.allow-prerelease }}
         AICONTRACTS_PIP_INDEX_URL: ${{ inputs.pip-index-url }}
         AICONTRACTS_PIP_EXTRA_INDEX_URL: ${{ inputs.pip-extra-index-url }}
-      # Keep the default PyPI pin aligned with the final action release tag.
-      # RC validators must override package-spec so the action installs the
-      # exact RC artifact being validated.
+      # Keep main safe before aicontracts 1.0.0 exists on PyPI. The v1.0.0
+      # release tag must either override package-spec during validation or
+      # switch this default to aicontracts==1.0.0 after the package is published.
       run: |
         set -euo pipefail
 

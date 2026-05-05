@@ -148,10 +148,10 @@ python -m agent_contracts.cli check-verdict "<PATH_TO_VERDICT_JSON>"
 
 At least one validator must add the action to a branch and link the run.
 Before this can satisfy the RC gate, the action run must install the same RC
-package artifact being validated. The action defaults to the final
-`aicontracts==1.0.0` package for stable release tags, so RC validators must
-override `package-spec` to the RC wheel URL, local wheel path, or pre-release
-requirement.
+package artifact being validated. Until the stable `aicontracts==1.0.0`
+package exists on PyPI, the action default stays pinned to the latest
+published 0.x package. RC validators must override `package-spec` to the RC
+wheel URL, local wheel path, or pre-release requirement.
 
 ```yaml
 name: Agent Contract

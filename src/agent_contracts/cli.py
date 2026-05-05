@@ -194,10 +194,10 @@ def init(
     else:
         if template == "coding":
             payload = {
-                "agent_contract": "0.1.0",
+                "agent_contract": "1.0.0",
                 "identity": {
                     "name": agent_name or "repo-build-agent",
-                    "version": agent_version or "0.1.0",
+                    "version": agent_version or "1.0.0",
                     "description": "Repo-local coding/build agent with fail-closed scopes.",
                 },
                 "effects": {
@@ -239,10 +239,10 @@ def init(
             }
         else:
             payload = {
-                "agent_contract": "0.1.0",
+                "agent_contract": "1.0.0",
                 "identity": {
                     "name": agent_name or "my-agent",
-                    "version": agent_version or "0.1.0",
+                    "version": agent_version or "1.0.0",
                     "description": "TODO: Describe what this agent does.",
                 },
                 "contract": {

@@ -200,11 +200,11 @@ def _extract_identity(traces: List[Dict[str, Any]]) -> Dict[str, str]:
             name = agent.get("name")
             version = agent.get("version")
             if name:
-                return {"name": str(name), "version": str(version or "0.1.0")}
+                return {"name": str(name), "version": str(version or "1.0.0")}
         agent_name = trace.get("agent_name") or trace.get("agent_id")
         if agent_name:
-            return {"name": str(agent_name), "version": "0.1.0"}
-    return {"name": "unnamed-agent", "version": "0.1.0"}
+            return {"name": str(agent_name), "version": "1.0.0"}
+    return {"name": "unnamed-agent", "version": "1.0.0"}
 
 
 def generate_contract_from_traces(
@@ -227,7 +227,7 @@ def generate_contract_from_traces(
     budgets = _extract_budgets(traces, max_shell_commands)
 
     contract: Dict[str, Any] = {
-        "agent_contract": "0.1.0",
+        "agent_contract": "1.0.0",
         "identity": identity,
         "contract": {
             "postconditions": [
