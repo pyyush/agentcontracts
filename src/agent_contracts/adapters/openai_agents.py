@@ -15,9 +15,14 @@ execution but not the token cost of the decision.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from agent_contracts.enforcer import ContractEnforcer, ContractViolation
+from agent_contracts.adapters._shared import (
+    finalize_adapter_run,
+    installed_package_version,
+    raise_if_blocking_verdict,
+)
+from agent_contracts.enforcer import ContractEnforcer, ContractViolation, RunVerdict
 from agent_contracts.loader import load_contract
 from agent_contracts.types import Contract
 from agent_contracts.violations import ViolationEvent
@@ -36,7 +41,20 @@ class ContractRunHooks(RunHooks):  # type: ignore[misc]
 
     Intercepts tool calls for effect gating and budget tracking.
     Tracks token usage from LLM responses.
-    Evaluates postconditions on agent completion.
+    Finalizes a verdict on agent completion.
+
+    Run lifecycle:
+    - the contract run id is allocated when this object is created
+    - on_agent_start marks host execution as started
+    - on_tool_start can block generic tool names before tool execution, after
+      the model has already chosen the tool
+    - file, shell, and network arguments are not visible in the OpenAI
+      RunHooks surface used here; wrap those effects as named tools or rely on
+      the CI verdict gate for post-run detection
+    - on_agent_end validates output, evaluates postconditions, and writes the
+      verdict artifact
+    - finalize_run() can be called from a surrounding exception handler to
+      write a failed verdict for unexpected host errors
     """
 
     def __init__(
@@ -51,8 +69,12 @@ class ContractRunHooks(RunHooks):  # type: ignore[misc]
             contract,
             violation_destination=violation_destination,
             violation_callback=violation_callback,
+            host_name="openai-agents",
+            host_version=installed_package_version("openai-agents"),
         )
         self._raise_on_violation = raise_on_violation
+        self._started = False
+        self._observed_completion = False
 
     @classmethod
     def from_file(
@@ -89,7 +111,8 @@ class ContractRunHooks(RunHooks):  # type: ignore[misc]
         tool_name = getattr(tool, "name", str(tool))
         try:
             self._enforcer.check_tool_call(tool_name)
-        except ContractViolation:
+        except ContractViolation as exc:
+            self.finalize_run(execution_error=exc)
             if self._raise_on_violation:
                 raise
 
@@ -114,26 +137,49 @@ class ContractRunHooks(RunHooks):  # type: ignore[misc]
         if usage is not None:
             total = getattr(usage, "total_tokens", 0)
             if total and total > 0:
-                self._enforcer.add_tokens(total)
+                try:
+                    self._enforcer.add_tokens(total)
+                except ContractViolation as exc:
+                    self.finalize_run(execution_error=exc)
+                    if self._raise_on_violation:
+                        raise
 
     async def on_agent_start(
         self, context: Any, agent: Any
     ) -> None:
         """Called when an agent starts executing."""
-        pass
+        self._started = True
 
     async def on_agent_end(
         self, context: Any, agent: Any, output: Any
     ) -> None:
-        """Called when an agent finishes — evaluate postconditions."""
-        try:
-            self._enforcer.evaluate_postconditions(output)
-        except ContractViolation:
-            if self._raise_on_violation:
-                raise
+        """Called when an agent finishes — finalize the verdict artifact."""
+        self._observed_completion = True
+        verdict = self.finalize_run(output=output)
+        raise_if_blocking_verdict(verdict, enabled=self._raise_on_violation)
 
     async def on_handoff(
         self, context: Any, input: Any
     ) -> None:
         """Called during agent handoffs — observe, don't enforce yet."""
         pass
+
+    def finalize_run(
+        self,
+        *,
+        output: Any = None,
+        extra_context: Optional[Dict[str, Any]] = None,
+        artifact_path: Optional[Union[str, Path]] = None,
+        execution_error: Optional[BaseException] = None,
+    ) -> RunVerdict:
+        """Write and return the schema-backed verdict artifact for this run."""
+        observed_completion = self._observed_completion or output is not None or execution_error is not None
+        return finalize_adapter_run(
+            self._enforcer,
+            adapter_name="OpenAI Agents SDK adapter",
+            observed_completion=observed_completion,
+            output=output,
+            extra_context=extra_context,
+            artifact_path=artifact_path,
+            execution_error=execution_error,
+        )

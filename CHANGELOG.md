@@ -2,6 +2,48 @@
 
 All notable changes to this project are tracked here.
 
+## Unreleased
+
+### Release target
+
+- preparing `aicontracts 1.0.0` and contract spec `1.0.0`; this is not published until both the PyPI package and the `v1.0.0` GitHub tag exist
+- aligned package source version, public examples, README release references, GitHub Action install pin, and spec text around the planned `1.0.0` stable release
+- documented that package versions and `agent_contract` spec versions are distinct SemVer streams after the initial stable alignment
+- documented SemVer stability policy for the Python API, CLI, contract schema, verdict schema, and GitHub Action behavior
+
+### Added
+
+- added a JSON Schema for verdict artifacts and made `check-verdict` validate artifacts before outcome gating
+- added explicit adapter verdict finalizers for Claude Agent SDK, OpenAI Agents SDK, and LangChain integrations
+- added adapter lifecycle tests covering schema-valid pass, blocked, failed-output, and unexpected-error verdict paths
+- added runnable release demos for green pass, blocked file write, blocked shell command, and failed repo checks
+- added schema-valid sample verdict artifacts under `examples/verdicts/`
+- added generated API reference docs plus `scripts/generate_api_reference.py`
+- added adoption, migration, and troubleshooting docs for the `0.2.0` to `1.0.0` path
+- added GitHub Action RC install inputs so validators can install the exact release-candidate package artifact without changing the final stable default
+- added release workflow prerelease detection so PEP 440 RC tags create GitHub prereleases
+
+### Changed
+
+- changed canonical contracts and examples to declare `agent_contract: "1.0.0"` for the stable spec
+- changed OpenAI Agents SDK and LangChain completion callbacks to finalize verdict artifacts instead of only evaluating postconditions in memory
+- changed source distributions to include public docs, examples, spec files, and release notes needed for offline adoption
+- changed package metadata to classify the `1.0.0` release train as production/stable
+
+### Security
+
+- updated the optional LangChain adapter extra from `langchain-core==1.2.26` to `langchain-core==1.2.28`, which includes the fix for `CVE-2026-40087`
+- changed configured effect authorization to fail closed for omitted `filesystem` and `shell` sub-surfaces; once `effects.authorized` is present, omitted file or shell authorization denies those effects by default
+- changed `eval:` postconditions to stop auto-passing without evaluator integration; blocking eval checks fail closed, while warning and async eval checks emit visible warnings
+
+### Migration from 0.2.0
+
+- set stable contracts to `agent_contract: "1.0.0"`
+- explicitly list intended `filesystem` and `shell` authorizations whenever `effects.authorized` is present
+- review path globs for canonical repo-relative matching; traversal-shaped inputs no longer match allowlisted prefixes
+- replace placeholder blocking `eval:` checks with deterministic checks or a concrete evaluator integration
+- gate schema-backed verdict artifacts with `aicontracts check-verdict`
+
 ## [0.2.0] - 2026-04-06
 
 ### Added

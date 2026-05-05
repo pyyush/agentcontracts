@@ -10,8 +10,10 @@ from unittest.mock import MagicMock
 import pytest
 import yaml
 
+from agent_contracts.adapters import AdapterVerdictError
 from agent_contracts.adapters.openai_agents import ContractRunHooks
 from agent_contracts.enforcer import ContractViolation
+from agent_contracts.schema import validate_verdict_against_schema
 
 
 @pytest.fixture
@@ -72,6 +74,10 @@ class TestContractRunHooks:
 
     def test_postconditions_on_agent_end(self, hooks) -> None:
         run_async(hooks.on_agent_end(None, None, {"result": "data"}))
+        verdict = hooks.enforcer.finalized_verdict
+        assert verdict is not None
+        assert verdict.outcome == "pass"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
 
     def test_violations_accumulated(self, hooks) -> None:
         tool = MagicMock()
@@ -101,6 +107,53 @@ class TestContractRunHooks:
 
     def test_on_llm_start(self, hooks) -> None:
         run_async(hooks.on_llm_start(None, None, None, None))
+
+    def test_blocked_tool_finalizes_schema_valid_verdict(self, hooks) -> None:
+        tool = MagicMock()
+        tool.name = "delete_all"
+        with pytest.raises(ContractViolation):
+            run_async(hooks.on_tool_start(None, None, tool))
+
+        verdict = hooks.enforcer.finalized_verdict
+        assert verdict is not None
+        assert verdict.outcome == "blocked"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_failed_output_finalizes_schema_valid_verdict(self, tmp_path, tier1_data) -> None:
+        p = tmp_path / "contract.yaml"
+        p.write_text(yaml.dump(tier1_data, sort_keys=False), encoding="utf-8")
+        h = ContractRunHooks.from_file(p, raise_on_violation=False)
+
+        run_async(h.on_agent_end(None, None, {"result": 123}))
+
+        verdict = h.enforcer.finalized_verdict
+        assert verdict is not None
+        assert verdict.outcome == "fail"
+        assert any(check.name == "adapter.output_schema" for check in verdict.checks)
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_failed_output_raises_typed_error_in_strict_mode(self, hooks) -> None:
+        with pytest.raises(AdapterVerdictError, match="outcome=fail"):
+            run_async(hooks.on_agent_end(None, None, {"result": 123}))
+
+        verdict = hooks.enforcer.finalized_verdict
+        assert verdict is not None
+        assert verdict.outcome == "fail"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_unexpected_error_finalizes_schema_valid_verdict(self, hooks, tmp_path) -> None:
+        verdict = hooks.finalize_run(
+            execution_error=RuntimeError("boom"),
+            artifact_path=tmp_path / "error.json",
+        )
+        assert verdict.outcome == "fail"
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_finalize_without_observed_output_fails_closed(self, hooks, tmp_path) -> None:
+        verdict = hooks.finalize_run(artifact_path=tmp_path / "partial.json")
+        assert verdict.outcome == "fail"
+        assert any(check.name == "adapter.observed_completion" for check in verdict.checks)
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
 
 
 class TestRealSDKIntegration:

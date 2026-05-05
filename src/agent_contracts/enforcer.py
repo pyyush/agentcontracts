@@ -423,12 +423,38 @@ class ContractEnforcer:
             merged_context.update(extra_context)
 
         def on_warn(postcondition: Any, _: Any) -> None:
-            message = f"Postcondition '{postcondition.name}' failed (sync_warn)"
+            is_eval_check = str(postcondition.check).strip().startswith("eval:")
+            if is_eval_check:
+                message = (
+                    f"Postcondition '{postcondition.name}' uses unsupported eval check "
+                    "(sync_warn)"
+                )
+            else:
+                message = f"Postcondition '{postcondition.name}' failed (sync_warn)"
             self._warnings.append(message)
             self._record_warn_event(
                 clause=f"contract.postconditions.{postcondition.name}",
                 evidence={
                     "check": postcondition.check,
+                    "reason": "eval_evaluator_required" if is_eval_check else "failed",
+                    "checks": self._check_context(),
+                },
+                severity=postcondition.severity,
+            )
+
+        def on_async(postcondition: Any, _: Any) -> None:
+            if not str(postcondition.check).strip().startswith("eval:"):
+                return
+            message = (
+                f"Postcondition '{postcondition.name}' uses unsupported eval check "
+                "(async_monitor)"
+            )
+            self._warnings.append(message)
+            self._record_warn_event(
+                clause=f"contract.postconditions.{postcondition.name}",
+                evidence={
+                    "check": postcondition.check,
+                    "reason": "eval_evaluator_required",
                     "checks": self._check_context(),
                 },
                 severity=postcondition.severity,
@@ -441,6 +467,7 @@ class ContractEnforcer:
                 output,
                 extra_context=merged_context,
                 on_warn=on_warn,
+                on_async=on_async,
             )
         except PostconditionError as exc:
             self._postconditions_evaluated = True

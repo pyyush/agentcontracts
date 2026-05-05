@@ -9,3 +9,7 @@ gate is the source of truth.
     pip install aicontracts[openai]
     pip install aicontracts[langchain]
 """
+
+from agent_contracts.adapters._shared import AdapterVerdictError
+
+__all__ = ["AdapterVerdictError"]

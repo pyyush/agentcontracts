@@ -1,0 +1,43 @@
+{
+  "run_id": "example-blocked-command",
+  "contract": {
+    "name": "blocked-command-demo",
+    "version": "1.0.0",
+    "spec_version": "1.0.0"
+  },
+  "host": {
+    "name": "examples/run_blocked_command.py",
+    "version": "demo"
+  },
+  "outcome": "blocked",
+  "final_gate": "blocked",
+  "violations": [
+    {
+      "contract_id": "blocked-command-demo",
+      "contract_version": "1.0.0",
+      "violated_clause": "effects.authorized.shell.commands",
+      "evidence": {
+        "command": "python -m pytest tests/ ; rm -rf /",
+        "authorized": ["python -m pytest *", "python -m ruff check *"]
+      },
+      "severity": "critical",
+      "enforcement": "blocked",
+      "timestamp": "2026-05-04T00:00:00+00:00",
+      "event_id": "example-blocked-command-event"
+    }
+  ],
+  "checks": [],
+  "budgets": {
+    "cost_usd": 0.0,
+    "tokens": 0,
+    "tool_calls": 0,
+    "shell_commands": 0,
+    "duration_seconds": 0.01
+  },
+  "artifacts": {
+    "verdict_path": ".agent-contracts/runs/example-blocked-command/verdict.json",
+    "contract_path": "examples/demo_blocked_command.yaml"
+  },
+  "timestamp": "2026-05-04T00:00:00+00:00",
+  "warnings": []
+}

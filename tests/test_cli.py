@@ -25,6 +25,48 @@ def contract_file(tmp_path: Path, tier1_data: Dict[str, Any]) -> Path:
     return path
 
 
+@pytest.fixture
+def verdict_payload() -> Dict[str, Any]:
+    return {
+        "run_id": "run-123",
+        "contract": {
+            "name": "test-agent",
+            "version": "1.0.0",
+            "spec_version": "0.1.0",
+        },
+        "host": {"name": "pytest", "version": "1.0.0"},
+        "outcome": "pass",
+        "final_gate": "allowed",
+        "violations": [],
+        "checks": [
+            {
+                "name": "pytest",
+                "status": "pass",
+                "required": True,
+                "exit_code": 0,
+                "detail": "passed",
+                "evidence": {"command": "python3 -m pytest"},
+            }
+        ],
+        "budgets": {
+            "cost_usd": 0.0,
+            "tokens": 0,
+            "tool_calls": 0,
+            "shell_commands": 0,
+            "duration_seconds": 0.1,
+        },
+        "artifacts": {"verdict_path": ".agent-contracts/runs/run-123/verdict.json"},
+        "timestamp": "2026-05-04T00:00:00+00:00",
+        "warnings": [],
+    }
+
+
+def _write_verdict(tmp_path: Path, payload: Dict[str, Any]) -> Path:
+    verdict = tmp_path / "verdict.json"
+    verdict.write_text(json.dumps(payload), encoding="utf-8")
+    return verdict
+
+
 class TestValidate:
     def test_valid_contract(self, runner: CliRunner, contract_file: Path) -> None:
         result = runner.invoke(main, ["validate", str(contract_file)])
@@ -70,14 +112,20 @@ class TestInit:
     def test_template_generation(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["init", "--name", "test-agent"])
         assert result.exit_code == 0
-        assert "test-agent" in result.output
-        assert "postconditions" in result.output
+        parsed = yaml.safe_load(result.output)
+        assert parsed["agent_contract"] == "1.0.0"
+        assert parsed["identity"]["name"] == "test-agent"
+        assert parsed["identity"]["version"] == "1.0.0"
+        assert "postconditions" in parsed["contract"]
 
     def test_coding_template_generation(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["init", "--template", "coding"])
         assert result.exit_code == 0
-        assert "filesystem:" in result.output
-        assert "run_artifact_path" in result.output
+        parsed = yaml.safe_load(result.output)
+        assert parsed["agent_contract"] == "1.0.0"
+        assert parsed["identity"]["version"] == "1.0.0"
+        assert "filesystem" in parsed["effects"]["authorized"]
+        assert "run_artifact_path" in parsed["observability"]
 
     def test_output_to_file(self, runner: CliRunner, tmp_path: Path) -> None:
         out = tmp_path / "generated.yaml"
@@ -100,24 +148,102 @@ class TestInit:
         trace_file.write_text("\n".join(json.dumps(t) for t in traces), encoding="utf-8")
         result = runner.invoke(main, ["init", "--from-trace", str(trace_file)])
         assert result.exit_code == 0
-        assert "trace-agent" in result.output
-        assert "filesystem" in result.output
-        assert "shell" in result.output
+        parsed = yaml.safe_load(result.output)
+        assert parsed["agent_contract"] == "1.0.0"
+        assert parsed["identity"] == {"name": "trace-agent", "version": "1.0.0"}
+        assert "filesystem" in parsed["effects"]["authorized"]
+        assert "shell" in parsed["effects"]["authorized"]
 
 
 class TestCheckVerdict:
-    def test_pass(self, runner: CliRunner, tmp_path: Path) -> None:
-        verdict = tmp_path / "verdict.json"
-        verdict.write_text(json.dumps({"outcome": "pass", "final_gate": "allowed", "checks": []}), encoding="utf-8")
+    def test_pass(self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]) -> None:
+        verdict = _write_verdict(tmp_path, verdict_payload)
         result = runner.invoke(main, ["check-verdict", str(verdict)])
         assert result.exit_code == 0
         assert "Outcome: pass" in result.output
 
-    def test_fail(self, runner: CliRunner, tmp_path: Path) -> None:
-        verdict = tmp_path / "verdict.json"
-        verdict.write_text(json.dumps({"outcome": "fail", "final_gate": "failed", "checks": []}), encoding="utf-8")
+    def test_warn(self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]) -> None:
+        verdict_payload["outcome"] = "warn"
+        verdict = _write_verdict(tmp_path, verdict_payload)
+        result = runner.invoke(main, ["check-verdict", str(verdict)])
+        assert result.exit_code == 0
+        assert "Outcome: warn" in result.output
+
+    def test_warn_fail_on_warn(
+        self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]
+    ) -> None:
+        verdict_payload["outcome"] = "warn"
+        verdict = _write_verdict(tmp_path, verdict_payload)
+        result = runner.invoke(main, ["check-verdict", str(verdict), "--fail-on-warn"])
+        assert result.exit_code == 1
+        assert "Outcome: warn" in result.output
+
+    def test_warn_json_fail_on_warn(
+        self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]
+    ) -> None:
+        verdict_payload["outcome"] = "warn"
+        verdict = _write_verdict(tmp_path, verdict_payload)
+        result = runner.invoke(
+            main, ["check-verdict", str(verdict), "--json-output", "--fail-on-warn"]
+        )
+        assert result.exit_code == 1
+        assert json.loads(result.output)["outcome"] == "warn"
+
+    def test_blocked(self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]) -> None:
+        verdict_payload["outcome"] = "blocked"
+        verdict_payload["final_gate"] = "blocked"
+        verdict = _write_verdict(tmp_path, verdict_payload)
         result = runner.invoke(main, ["check-verdict", str(verdict)])
         assert result.exit_code == 1
+        assert "Outcome: blocked" in result.output
+
+    def test_fail(self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]) -> None:
+        verdict_payload["outcome"] = "fail"
+        verdict_payload["final_gate"] = "failed"
+        verdict = _write_verdict(tmp_path, verdict_payload)
+        result = runner.invoke(main, ["check-verdict", str(verdict)])
+        assert result.exit_code == 1
+
+    def test_malformed_json(self, runner: CliRunner, tmp_path: Path) -> None:
+        verdict = tmp_path / "verdict.json"
+        verdict.write_text("{not-json", encoding="utf-8")
+        result = runner.invoke(main, ["check-verdict", str(verdict)])
+        assert result.exit_code == 1
+        assert "Verdict JSON error" in result.output
+
+    def test_missing_required_fields(self, runner: CliRunner, tmp_path: Path) -> None:
+        verdict = _write_verdict(tmp_path, {"outcome": "pass", "final_gate": "allowed"})
+        result = runner.invoke(main, ["check-verdict", str(verdict)])
+        assert result.exit_code == 1
+        assert "Verdict schema error" in result.output
+        assert "run_id" in result.output
+
+    def test_missing_required_fields_json_output(self, runner: CliRunner, tmp_path: Path) -> None:
+        verdict = _write_verdict(tmp_path, {"outcome": "pass", "final_gate": "allowed"})
+        result = runner.invoke(main, ["check-verdict", str(verdict), "--json-output"])
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["valid"] is False
+        assert any("run_id" in error for error in payload["errors"])
+
+    def test_invalid_outcome(self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]) -> None:
+        verdict_payload["outcome"] = "green"
+        verdict = _write_verdict(tmp_path, verdict_payload)
+        result = runner.invoke(main, ["check-verdict", str(verdict)])
+        assert result.exit_code == 1
+        assert "Verdict schema error" in result.output
+        assert "outcome" in result.output
+
+    def test_invalid_outcome_gate_pair(
+        self, runner: CliRunner, tmp_path: Path, verdict_payload: Dict[str, Any]
+    ) -> None:
+        verdict_payload["outcome"] = "pass"
+        verdict_payload["final_gate"] = "blocked"
+        verdict = _write_verdict(tmp_path, verdict_payload)
+        result = runner.invoke(main, ["check-verdict", str(verdict)])
+        assert result.exit_code == 1
+        assert "Verdict schema error" in result.output
+        assert "final_gate" in result.output
 
 
 class TestTestCommand:

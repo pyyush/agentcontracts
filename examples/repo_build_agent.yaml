@@ -1,8 +1,8 @@
-agent_contract: "0.1.0"
+agent_contract: "1.0.0"
 
 identity:
   name: repo-build-agent
-  version: "0.1.0"
+  version: "1.0.0"
   description: Repo-local coding/build agent with bounded file and shell scope.
 
 contract:

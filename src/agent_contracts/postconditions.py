@@ -19,6 +19,9 @@ from typing import Any, Callable, Dict, List, Optional
 
 from agent_contracts.types import PostconditionDef, PreconditionDef
 
+PostconditionCallback = Callable[[PostconditionDef, Any], None]
+EvalEvaluator = Callable[[PostconditionDef, Any, Dict[str, Any]], bool]
+
 _OPERATORS = {
     "==": operator.eq,
     "!=": operator.ne,
@@ -260,13 +263,33 @@ class PostconditionResult:
     enforcement: str
 
 
+def _is_eval_check(check: str) -> bool:
+    return check.strip().startswith("eval:")
+
+
+def _handle_failed_postcondition(
+    postcondition: PostconditionDef,
+    output: Any,
+    *,
+    on_warn: Optional[PostconditionCallback],
+    on_async: Optional[PostconditionCallback],
+) -> None:
+    if postcondition.enforcement == "sync_block":
+        raise PostconditionError(postcondition, output)
+    if postcondition.enforcement == "sync_warn" and on_warn:
+        on_warn(postcondition, output)
+    if postcondition.enforcement == "async_monitor" and on_async:
+        on_async(postcondition, output)
+
+
 def evaluate_postconditions(
     postconditions: List[PostconditionDef],
     output: Any,
     *,
     extra_context: Optional[Dict[str, Any]] = None,
-    on_warn: Optional[Callable[[PostconditionDef, Any], None]] = None,
-    on_async: Optional[Callable[[PostconditionDef, Any], None]] = None,
+    on_warn: Optional[PostconditionCallback] = None,
+    on_async: Optional[PostconditionCallback] = None,
+    eval_evaluator: Optional[EvalEvaluator] = None,
 ) -> List[PostconditionResult]:
     context: Dict[str, Any] = {"output": output}
     if extra_context:
@@ -275,29 +298,27 @@ def evaluate_postconditions(
     results: List[PostconditionResult] = []
 
     for pc in postconditions:
-        if pc.enforcement == "async_monitor":
+        if _is_eval_check(pc.check):
+            passed = (
+                bool(eval_evaluator(pc, output, context))
+                if eval_evaluator is not None
+                else False
+            )
+        elif pc.enforcement == "async_monitor":
             if on_async:
                 on_async(pc, output)
             results.append(
                 PostconditionResult(postcondition=pc, passed=True, enforcement="async_monitor")
             )
             continue
+        else:
+            passed = evaluate_expression(pc.check, context)
 
-        if pc.check.startswith("eval:"):
-            results.append(
-                PostconditionResult(postcondition=pc, passed=True, enforcement=pc.enforcement)
-            )
-            continue
-
-        passed = evaluate_expression(pc.check, context)
         results.append(
             PostconditionResult(postcondition=pc, passed=passed, enforcement=pc.enforcement)
         )
 
         if not passed:
-            if pc.enforcement == "sync_block":
-                raise PostconditionError(pc, output)
-            if pc.enforcement == "sync_warn" and on_warn:
-                on_warn(pc, output)
+            _handle_failed_postcondition(pc, output, on_warn=on_warn, on_async=on_async)
 
     return results

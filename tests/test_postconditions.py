@@ -84,9 +84,49 @@ class TestEvaluatePostconditions:
         assert warnings == ["warn_check"]
         assert results[0].passed is False
 
-    def test_eval_judge_skipped(self) -> None:
+    def test_eval_sync_block_without_evaluator_raises(self) -> None:
         pcs = [PostconditionDef(name="judge", check="eval:quality_judge", enforcement="sync_block")]
-        assert evaluate_postconditions(pcs, "anything")[0].passed is True
+        with pytest.raises(PostconditionError, match="judge"):
+            evaluate_postconditions(pcs, "anything")
+
+    def test_eval_sync_block_with_evaluator_can_pass(self) -> None:
+        pcs = [PostconditionDef(name="judge", check="eval:quality_judge", enforcement="sync_block")]
+        results = evaluate_postconditions(
+            pcs,
+            "anything",
+            eval_evaluator=lambda pc, output, context: output == "anything"
+            and context["output"] == "anything"
+            and pc.check == "eval:quality_judge",
+        )
+        assert results[0].passed is True
+
+    def test_eval_sync_warn_without_evaluator_warns(self) -> None:
+        warnings: list[str] = []
+        pcs = [PostconditionDef(name="judge", check="eval:quality_judge", enforcement="sync_warn")]
+        results = evaluate_postconditions(
+            pcs,
+            "anything",
+            on_warn=lambda pc, output: warnings.append(pc.name),
+        )
+        assert warnings == ["judge"]
+        assert results[0].passed is False
+
+    def test_eval_async_monitor_without_evaluator_is_visible(self) -> None:
+        async_checks: list[str] = []
+        pcs = [
+            PostconditionDef(
+                name="judge",
+                check="eval:quality_judge",
+                enforcement="async_monitor",
+            )
+        ]
+        results = evaluate_postconditions(
+            pcs,
+            "anything",
+            on_async=lambda pc, output: async_checks.append(pc.name),
+        )
+        assert async_checks == ["judge"]
+        assert results[0].passed is False
 
     def test_checks_context(self) -> None:
         pcs = [

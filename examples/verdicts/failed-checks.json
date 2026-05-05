@@ -1,0 +1,78 @@
+{
+  "run_id": "example-failed-checks",
+  "contract": {
+    "name": "failed-checks-demo",
+    "version": "1.0.0",
+    "spec_version": "1.0.0"
+  },
+  "host": {
+    "name": "examples/run_failed_checks.py",
+    "version": "demo"
+  },
+  "outcome": "fail",
+  "final_gate": "failed",
+  "violations": [
+    {
+      "contract_id": "failed-checks-demo",
+      "contract_version": "1.0.0",
+      "violated_clause": "contract.postconditions.repo_checks_green",
+      "evidence": {
+        "check": "checks.pytest.exit_code == 0 and checks.ruff.exit_code == 0",
+        "checks": {
+          "pytest": {
+            "status": "fail",
+            "required": true,
+            "exit_code": 1,
+            "detail": "demo simulates a red test suite"
+          },
+          "ruff": {
+            "status": "pass",
+            "required": true,
+            "exit_code": 0,
+            "detail": "demo simulates lint passing"
+          }
+        },
+        "output_type": "dict"
+      },
+      "severity": "critical",
+      "enforcement": "failed",
+      "timestamp": "2026-05-04T00:00:00+00:00",
+      "event_id": "example-failed-checks-event"
+    }
+  ],
+  "checks": [
+    {
+      "name": "pytest",
+      "status": "fail",
+      "required": true,
+      "exit_code": 1,
+      "detail": "demo simulates a red test suite",
+      "evidence": {
+        "command": "python -m pytest"
+      }
+    },
+    {
+      "name": "ruff",
+      "status": "pass",
+      "required": true,
+      "exit_code": 0,
+      "detail": "demo simulates lint passing",
+      "evidence": {
+        "command": "python -m ruff check src/ tests/"
+      }
+    }
+  ],
+  "budgets": {
+    "cost_usd": 0.0,
+    "tokens": 0,
+    "tool_calls": 0,
+    "shell_commands": 0,
+    "duration_seconds": 0.01
+  },
+  "artifacts": {
+    "verdict_path": ".agent-contracts/runs/example-failed-checks/verdict.json",
+    "contract_path": "examples/demo_failed_checks.yaml"
+  },
+  "timestamp": "2026-05-04T00:00:00+00:00",
+  "warnings": []
+}

@@ -28,8 +28,15 @@ jobs:
       - name: Type check
         run: python -m mypy src/agent_contracts
       - name: Test
+        env:
+          AICONTRACTS_ENFORCE_PERF_BUDGETS: ${{ matrix.python-version == '3.11' && 'true' || 'false' }}
         run: python -m pytest --cov=agent_contracts --cov-report=term-missing
       - name: Validate canonical contracts
         run: |
           python -m agent_contracts.cli validate AGENT_CONTRACT.yaml
           python -m agent_contracts.cli validate examples/support_triage.yaml
+          python -m agent_contracts.cli check-compat examples/support_triage.yaml examples/support_triage.yaml
+      - name: Install audit tool
+        run: python -m pip install pip-audit
+      - name: Audit project dependencies
+        run: python -m pip_audit . --progress-spinner off

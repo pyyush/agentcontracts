@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from agent_contracts.effects import (
@@ -67,12 +69,69 @@ class TestEffectGuard:
         assert guard.check_file_write("src/main.py") is True
         assert guard.check_file_write("tests/test_main.py") is False
 
+    def test_configured_authorization_without_filesystem_denies_file_effects(self) -> None:
+        guard = EffectGuard(EffectsAuthorized(tools=["search"]))
+
+        assert guard.check_file_read("src/main.py") is False
+        assert guard.check_file_write("src/main.py") is False
+        with pytest.raises(EffectDeniedError, match="filesystem.read"):
+            guard.require_file_read("src/main.py")
+        with pytest.raises(EffectDeniedError, match="filesystem.write"):
+            guard.require_file_write("src/main.py")
+
+    def test_filesystem_matches_canonical_repo_relative_paths(self, tmp_path: Path) -> None:
+        guard = EffectGuard(
+            EffectsAuthorized(
+                filesystem=FilesystemAuthorization(
+                    read=["src/**", "README.md"],
+                    write=["src/**", "README.md"],
+                )
+            ),
+            repo_root=tmp_path,
+        )
+
+        assert guard.check_file_read("src/main.py") is True
+        assert guard.check_file_read(str(tmp_path / "src/main.py")) is True
+        assert guard.check_file_write("README.md") is True
+        assert guard.check_file_write(str(tmp_path / "README.md")) is True
+
+    def test_filesystem_traversal_does_not_match_raw_allowlist_prefix(self, tmp_path: Path) -> None:
+        guard = EffectGuard(
+            EffectsAuthorized(filesystem=FilesystemAuthorization(read=["src/**"], write=["src/**"])),
+            repo_root=tmp_path,
+        )
+
+        assert guard.check_file_read("src/../.env") is False
+        assert guard.check_file_write("src/../.env") is False
+        assert guard.check_file_read("src/../tests/test_app.py") is False
+        with pytest.raises(EffectDeniedError, match="filesystem.write"):
+            guard.require_file_write("src/../.env")
+
+    def test_filesystem_denies_paths_outside_repo_root(self, tmp_path: Path) -> None:
+        guard = EffectGuard(
+            EffectsAuthorized(filesystem=FilesystemAuthorization(read=["**"], write=["**"])),
+            repo_root=tmp_path,
+        )
+        outside_path = tmp_path.parent / f"{tmp_path.name}-outside" / "secret.txt"
+
+        assert guard.check_file_read(str(outside_path)) is False
+        assert guard.check_file_write(str(outside_path)) is False
+        with pytest.raises(EffectDeniedError, match="filesystem.read"):
+            guard.require_file_read(str(outside_path))
+
     def test_shell_command_checks(self) -> None:
         guard = EffectGuard(
             EffectsAuthorized(shell=ShellAuthorization(commands=["python -m pytest *"]))
         )
         assert guard.check_shell_command("python -m pytest tests/test_app.py") is True
         assert guard.check_shell_command("python -m mypy src") is False
+
+    def test_configured_authorization_without_shell_denies_shell_commands(self) -> None:
+        guard = EffectGuard(EffectsAuthorized(tools=["search"]))
+
+        assert guard.check_shell_command("python -m pytest tests/test_app.py") is False
+        with pytest.raises(EffectDeniedError, match="shell.command"):
+            guard.require_shell_command("python -m pytest tests/test_app.py")
 
     @pytest.mark.parametrize(
         "command",

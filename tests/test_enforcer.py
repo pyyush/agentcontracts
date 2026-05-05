@@ -16,6 +16,7 @@ from agent_contracts.enforcer import (
 )
 from agent_contracts.loader import load_contract
 from agent_contracts.postconditions import PostconditionError
+from agent_contracts.schema import get_verdict_schema, validate_verdict_against_schema
 
 
 @pytest.fixture
@@ -76,12 +77,40 @@ class TestContractEnforcer:
         loaded = load_verdict_artifact(verdict.artifacts["verdict_path"])
         assert loaded["outcome"] == "blocked"
 
+    def test_file_write_blocked_when_filesystem_authorization_omitted(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        del coding_contract_data["effects"]["authorized"]["filesystem"]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        with pytest.raises(ContractViolation, match="File write"):
+            enforcer.check_file_write("src/app.py")
+
+        verdict = enforcer.finalize_run()
+        assert verdict.outcome == "blocked"
+        assert verdict.violations[0]["violated_clause"] == "effects.authorized.filesystem.write"
+
     def test_shell_command_blocked(self, tmp_yaml, coding_contract_data, tmp_path: Path) -> None:
         contract = load_contract(tmp_yaml(coding_contract_data))
         enforcer = ContractEnforcer(contract, repo_root=tmp_path)
         with pytest.raises(ContractViolation, match="Shell command"):
             enforcer.check_shell_command("python -m mypy src")
         assert enforcer.finalize_run().outcome == "blocked"
+
+    def test_shell_command_blocked_when_shell_authorization_omitted(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        del coding_contract_data["effects"]["authorized"]["shell"]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        with pytest.raises(ContractViolation, match="Shell command"):
+            enforcer.check_shell_command("python -m pytest tests/test_app.py")
+
+        verdict = enforcer.finalize_run()
+        assert verdict.outcome == "blocked"
+        assert verdict.violations[0]["violated_clause"] == "effects.authorized.shell.commands"
 
     def test_shell_command_budget(self, tmp_yaml, coding_contract_data, tmp_path: Path) -> None:
         contract = load_contract(tmp_yaml(coding_contract_data))
@@ -100,6 +129,78 @@ class TestContractEnforcer:
         assert verdict.final_gate == "failed"
         assert any(v["violated_clause"] == "contract.postconditions.repo_checks_green" for v in verdict.violations)
 
+    def test_eval_sync_block_without_evaluator_fails_verdict(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        coding_contract_data["contract"]["postconditions"] = [
+            {
+                "name": "quality_judge",
+                "check": "eval:quality_judge",
+                "enforcement": "sync_block",
+                "severity": "critical",
+            }
+        ]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        verdict = enforcer.finalize_run(output={"status": "done"})
+
+        assert verdict.outcome == "fail"
+        assert verdict.final_gate == "failed"
+        assert any(
+            v["violated_clause"] == "contract.postconditions.quality_judge"
+            and v["evidence"]["check"] == "eval:quality_judge"
+            for v in verdict.violations
+        )
+
+    def test_eval_sync_warn_without_evaluator_warns_verdict(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        coding_contract_data["contract"]["postconditions"] = [
+            {
+                "name": "quality_judge",
+                "check": "eval:quality_judge",
+                "enforcement": "sync_warn",
+                "severity": "major",
+            }
+        ]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        verdict = enforcer.finalize_run(output={"status": "done"})
+
+        assert verdict.outcome == "warn"
+        assert any("quality_judge" in warning for warning in verdict.warnings)
+        assert any(
+            v["violated_clause"] == "contract.postconditions.quality_judge"
+            and v["enforcement"] == "warned"
+            for v in verdict.violations
+        )
+
+    def test_eval_async_monitor_without_evaluator_warns_verdict(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        coding_contract_data["contract"]["postconditions"] = [
+            {
+                "name": "quality_judge",
+                "check": "eval:quality_judge",
+                "enforcement": "async_monitor",
+                "severity": "minor",
+            }
+        ]
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path)
+
+        verdict = enforcer.finalize_run(output={"status": "done"})
+
+        assert verdict.outcome == "warn"
+        assert any("quality_judge" in warning for warning in verdict.warnings)
+        assert any(
+            v["violated_clause"] == "contract.postconditions.quality_judge"
+            and v["enforcement"] == "warned"
+            for v in verdict.violations
+        )
+
     def test_pass_verdict_writes_artifact(self, tmp_yaml, coding_contract_data, tmp_path: Path) -> None:
         contract = load_contract(tmp_yaml(coding_contract_data))
         enforcer = ContractEnforcer(contract, repo_root=tmp_path)
@@ -112,6 +213,23 @@ class TestContractEnforcer:
         payload = json.loads(verdict_path.read_text(encoding="utf-8"))
         assert payload["final_gate"] == "allowed"
         assert payload["budgets"]["shell_commands"] == 0
+
+    def test_generated_verdict_matches_schema(
+        self, tmp_yaml, coding_contract_data, tmp_path: Path
+    ) -> None:
+        contract = load_contract(tmp_yaml(coding_contract_data))
+        enforcer = ContractEnforcer(contract, repo_root=tmp_path, host_name="pytest")
+        enforcer.record_check("pytest", "pass", exit_code=0)
+        enforcer.record_check("ruff", "pass", exit_code=0)
+
+        verdict = enforcer.finalize_run(output={"status": "done"})
+
+        assert validate_verdict_against_schema(verdict.to_dict()) == []
+
+    def test_public_and_packaged_verdict_schemas_match(self) -> None:
+        public_schema_path = Path(__file__).resolve().parents[1] / "schemas" / "verdict.schema.json"
+
+        assert json.loads(public_schema_path.read_text(encoding="utf-8")) == get_verdict_schema()
 
     def test_cost_budget(self, enforcer_tier1) -> None:
         enforcer_tier1.add_cost(0.30)

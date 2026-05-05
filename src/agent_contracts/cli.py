@@ -12,6 +12,7 @@ import yaml
 
 from agent_contracts._version import __version__
 from agent_contracts.enforcer import load_verdict_artifact
+from agent_contracts.schema import validate_verdict_against_schema
 
 
 @click.group()
@@ -193,10 +194,10 @@ def init(
     else:
         if template == "coding":
             payload = {
-                "agent_contract": "0.1.0",
+                "agent_contract": "1.0.0",
                 "identity": {
                     "name": agent_name or "repo-build-agent",
-                    "version": agent_version or "0.1.0",
+                    "version": agent_version or "1.0.0",
                     "description": "Repo-local coding/build agent with fail-closed scopes.",
                 },
                 "effects": {
@@ -238,10 +239,10 @@ def init(
             }
         else:
             payload = {
-                "agent_contract": "0.1.0",
+                "agent_contract": "1.0.0",
                 "identity": {
                     "name": agent_name or "my-agent",
-                    "version": agent_version or "0.1.0",
+                    "version": agent_version or "1.0.0",
                     "description": "TODO: Describe what this agent does.",
                 },
                 "contract": {
@@ -268,7 +269,25 @@ def init(
 @click.option("--fail-on-warn", is_flag=True, help="Return non-zero for warn outcomes.")
 def check_verdict(verdict_path: str, json_output: bool, fail_on_warn: bool) -> None:
     """Inspect a verdict artifact and return a CI-friendly exit code."""
-    verdict = load_verdict_artifact(verdict_path)
+    try:
+        verdict = load_verdict_artifact(verdict_path)
+    except json.JSONDecodeError as exc:
+        click.echo(f"Verdict JSON error: {exc}", err=True)
+        sys.exit(1)
+    except OSError as exc:
+        click.echo(f"Verdict read error: {exc}", err=True)
+        sys.exit(1)
+
+    schema_errors = validate_verdict_against_schema(verdict)
+    if schema_errors:
+        if json_output:
+            click.echo(json.dumps({"valid": False, "errors": schema_errors}, indent=2))
+        else:
+            click.echo(f"Verdict schema error: {len(schema_errors)} error(s)", err=True)
+            for error in schema_errors:
+                click.echo(f"  - {error}", err=True)
+        sys.exit(1)
+
     outcome = verdict.get("outcome", "unknown")
     final_gate = verdict.get("final_gate", "unknown")
     should_fail = outcome in {"blocked", "fail"} or (fail_on_warn and outcome == "warn")

@@ -1,11 +1,11 @@
 # Tier 1 — Enforceable Contract
 # Adds cost control plus coding/build shell and file scopes.
 
-agent_contract: "0.1.0"
+agent_contract: "1.0.0"
 
 identity:
   name: cost-controlled-researcher
-  version: "0.1.0"
+  version: "1.0.0"
   description: Research helper with strict spend and execution controls.
 
 contract:

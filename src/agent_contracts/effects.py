@@ -111,19 +111,20 @@ class EffectGuard:
         """Whether effect authorization was configured on the contract."""
         return self._authorized is not None
 
-    def _path_candidates(self, path: str) -> List[str]:
+    def _repo_relative_path(self, path: str) -> Optional[str]:
         raw = Path(path)
         absolute = raw if raw.is_absolute() else (self._repo_root / raw)
         absolute = absolute.resolve()
-        candidates: List[str] = [path, absolute.as_posix()]
         try:
-            candidates.append(absolute.relative_to(self._repo_root).as_posix())
+            return absolute.relative_to(self._repo_root).as_posix()
         except ValueError:
-            pass
-        return list(dict.fromkeys(candidates))
+            return None
 
     def _filesystem_matches(self, path: str, patterns: Sequence[str]) -> bool:
-        return any(matches_any(candidate, patterns) for candidate in self._path_candidates(path))
+        relative_path = self._repo_relative_path(path)
+        if relative_path is None:
+            return False
+        return matches_any(relative_path, patterns)
 
     def _normalized_command(self, command: str) -> str:
         return " ".join(command.strip().split())
@@ -144,18 +145,24 @@ class EffectGuard:
         return matches_any(scope, self._authorized.state_writes)
 
     def check_file_read(self, path: str) -> bool:
-        if self._authorized is None or self._authorized.filesystem is None:
+        if self._authorized is None:
             return True
+        if self._authorized.filesystem is None:
+            return False
         return self._filesystem_matches(path, self._authorized.filesystem.read)
 
     def check_file_write(self, path: str) -> bool:
-        if self._authorized is None or self._authorized.filesystem is None:
+        if self._authorized is None:
             return True
+        if self._authorized.filesystem is None:
+            return False
         return self._filesystem_matches(path, self._authorized.filesystem.write)
 
     def check_shell_command(self, command: str) -> bool:
-        if self._authorized is None or self._authorized.shell is None:
+        if self._authorized is None:
             return True
+        if self._authorized.shell is None:
+            return False
         # Strict reject: any chaining/redirection/substitution metachar
         # bypasses fnmatch's `*` and would let an attacker append payloads
         # after an allowlisted prefix. Scan the RAW command (not the

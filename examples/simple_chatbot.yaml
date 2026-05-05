@@ -1,10 +1,10 @@
 # Tier 0 — Minimal Valid Contract
 
-agent_contract: "0.1.0"
+agent_contract: "1.0.0"
 
 identity:
   name: simple-chatbot
-  version: "0.1.0"
+  version: "1.0.0"
   description: Basic chatbot with one non-null response guarantee.
 
 contract:
